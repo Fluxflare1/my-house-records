@@ -23,3 +23,17 @@ TestResults.xml
 config/runtime-config.json
 .env
 service-account.json
+
+
+# Runtime config (never commit)
+config/runtime-config.json
+
+# Local env files
+.env
+apps/web/.env
+scripts/google-bootstrap/.env
+
+# Google service account keys (never commit)
+service-account.json
+apps/web/service-account.json
+scripts/google-bootstrap/service-account.json
