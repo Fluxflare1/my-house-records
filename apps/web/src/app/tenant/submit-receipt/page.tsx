@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { uploadPaymentReceipt } from "@/app/actions/payments";
+import { tenantUploadReceipt } from "@/app/actions/tenant-receipts";
 
 function fileToBase64(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -9,7 +9,6 @@ function fileToBase64(file: File): Promise<string> {
     reader.onerror = () => reject(new Error("Failed to read file"));
     reader.onload = () => {
       const result = String(reader.result || "");
-      // result looks like: data:<mime>;base64,<base64>
       const idx = result.indexOf("base64,");
       if (idx === -1) return reject(new Error("Invalid base64 data"));
       resolve(result.slice(idx + "base64,".length));
@@ -23,21 +22,25 @@ export default function TenantSubmitReceiptPage() {
   const [file, setFile] = useState<File | null>(null);
 
   async function submit() {
-    if (!paymentId) return alert("Payment ID required");
-    if (!file) return alert("Select a receipt file");
+    try {
+      if (!paymentId) return alert("Payment ID required");
+      if (!file) return alert("Select a receipt file");
 
-    const base64 = await fileToBase64(file);
+      const base64 = await fileToBase64(file);
 
-    const res = await uploadPaymentReceipt({
-      paymentId,
-      filename: file.name,
-      mimeType: file.type || "application/octet-stream",
-      base64
-    });
+      await tenantUploadReceipt({
+        paymentId,
+        filename: file.name,
+        mimeType: file.type || "application/octet-stream",
+        base64
+      });
 
-    alert(`Receipt uploaded and attached. Payment: ${res.paymentId}`);
-    setPaymentId("");
-    setFile(null);
+      alert("Receipt uploaded and attached to your payment");
+      setPaymentId("");
+      setFile(null);
+    } catch (e: any) {
+      alert(e?.message || "Upload failed");
+    }
   }
 
   return (
@@ -58,10 +61,6 @@ export default function TenantSubmitReceiptPage() {
           Upload Receipt
         </button>
       </section>
-
-      <p className="text-xs text-gray-600">
-        Note: Verification remains manual (Admin verifies against POS).
-      </p>
     </div>
   );
 }
