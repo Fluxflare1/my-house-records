@@ -5,6 +5,7 @@ import { generateId } from "@/lib/utils/id";
 import { nowISO } from "@/lib/utils/time";
 import { notifyTenantByOccupancy } from "@/lib/notifications/notify-helpers";
 import { billCreatedText } from "@/lib/notifications/templates";
+import { requireAdmin } from "@/lib/auth/guards";
 
 export async function createBill(input: {
   apartmentId: string;
@@ -14,6 +15,8 @@ export async function createBill(input: {
   expectedAmount: number;
   dueDate: string;
 }) {
+  await requireAdmin();
+
   const { sheets } = getAdapters();
   const row = {
     bill_id: generateId("bill"),
