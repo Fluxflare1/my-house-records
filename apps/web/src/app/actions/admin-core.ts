@@ -3,13 +3,7 @@
 import { getAdapters } from "@/lib/adapters";
 import { generateId } from "@/lib/utils/id";
 import { nowISO } from "@/lib/utils/time";
-
-/**
- * IMPORTANT:
- * - All writes happen here (server-only).
- * - UI will call these actions later.
- * - Rent is NOT a bill (separate actions/tables below).
- */
+import { assertNoActiveOccupancyOverlap } from "@/lib/domain/validators";
 
 export async function createProperty(input: { name: string; address: string }) {
   const { sheets } = getAdapters();
@@ -79,8 +73,7 @@ export async function createTenant(input: {
 }
 
 /**
- * Bond tenant to apartment = create occupancy.
- * NOTE: overlap validation will be enforced as a rule (Action 6) using getAll("occupancies").
+ * Bond tenant to apartment (creates occupancy) with strict overlap validation.
  */
 export async function bondOccupancy(input: {
   apartmentId: string;
@@ -88,6 +81,14 @@ export async function bondOccupancy(input: {
   startDate: string; // YYYY-MM-DD recommended
 }) {
   const { sheets } = getAdapters();
+
+  const existing = await sheets.getAll("occupancies");
+  assertNoActiveOccupancyOverlap({
+    apartmentId: input.apartmentId,
+    newStartDate: input.startDate,
+    existingOccupancies: existing as any
+  });
+
   const row = {
     occupancy_id: generateId("occ"),
     apartment_id: input.apartmentId,
@@ -97,13 +98,13 @@ export async function bondOccupancy(input: {
     status: "active",
     created_at: nowISO()
   };
+
   await sheets.appendRow("occupancies", Object.values(row));
   return row;
 }
 
 export async function endOccupancy(input: { occupancyId: string; endDate: string }) {
   const { sheets } = getAdapters();
-  // We update by key (server-only)
   await sheets.updateRow("occupancies", "occupancy_id", input.occupancyId, {
     end_date: input.endDate,
     status: "ended"
