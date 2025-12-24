@@ -1,8 +1,15 @@
 "use server";
 
 import { getAdapters } from "@/lib/adapters";
+import { getSession } from "@/lib/auth/session";
 
-export async function getTenantDashboard(tenantId: string) {
+export async function getTenantDashboard() {
+  const session = await getSession();
+  if (!session.user || session.user.role !== "tenant") {
+    throw new Error("Unauthorized");
+  }
+
+  const tenantId = session.user.tenantId;
   const { sheets } = getAdapters();
 
   const occupancies = (await sheets.getAll("occupancies")).filter(
