@@ -1,6 +1,7 @@
 "use server";
 
 import { getAdapters } from "@/lib/adapters";
+import { requireAdmin } from "@/lib/auth/guards";
 
 export type RefOption = { id: string; label: string };
 
@@ -9,6 +10,8 @@ function opt(id: any, label: any): RefOption {
 }
 
 export async function getReferenceData() {
+  await requireAdmin();
+
   const { sheets } = getAdapters();
 
   const [properties, apartmentTypes, apartments, tenants, occupancies] =
