@@ -25,8 +25,8 @@ export interface GoogleDriveConfig {
 }
 
 export interface AppConfig {
-  backend: "google" | "postgres";
-  google?: {
+  backend: "google";
+  google: {
     sheets: GoogleSheetsConfig;
     drive: GoogleDriveConfig;
   };
