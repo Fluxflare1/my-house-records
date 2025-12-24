@@ -5,6 +5,7 @@ import { generateId } from "@/lib/utils/id";
 import { nowISO } from "@/lib/utils/time";
 import { notifyTenantByPayment } from "@/lib/notifications/notify-helpers";
 import { paymentStatusText } from "@/lib/notifications/templates";
+import { requireAdmin } from "@/lib/auth/guards";
 
 export async function recordPayment(input: {
   apartmentId: string;
@@ -13,6 +14,8 @@ export async function recordPayment(input: {
   amount: number;
   posReference?: string;
 }) {
+  await requireAdmin();
+
   const { sheets } = getAdapters();
   const row = {
     payment_id: generateId("pay"),
@@ -35,6 +38,8 @@ export async function uploadPaymentReceipt(input: {
   mimeType: string;
   base64: string;
 }) {
+  await requireAdmin();
+
   const { sheets, drive } = getAdapters();
   const buffer = Buffer.from(input.base64, "base64");
   const uploaded = await drive.uploadBuffer("receipts", input.filename, input.mimeType, buffer);
@@ -50,6 +55,8 @@ export async function setPaymentVerification(input: {
   paymentId: string;
   status: "verified" | "rejected";
 }) {
+  await requireAdmin();
+
   const { sheets } = getAdapters();
   await sheets.updateRow("payments", "payment_id", input.paymentId, {
     verification_status: input.status
