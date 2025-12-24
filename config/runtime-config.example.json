@@ -1,0 +1,29 @@
+{
+  "backend": "google",
+  "google": {
+    "sheets": {
+      "spreadsheetId": "__REPLACE__",
+      "sheets": {
+        "properties": "properties",
+        "apartmentTypes": "apartment_types",
+        "apartments": "apartments",
+        "tenants": "tenants",
+        "occupancies": "occupancies",
+        "rents": "rents",
+        "bills": "bills",
+        "payments": "payments",
+        "allocations": "allocations",
+        "documents": "documents"
+      }
+    },
+    "drive": {
+      "rootFolderId": "__REPLACE__",
+      "folders": {
+        "receipts": "__REPLACE__",
+        "statements": "__REPLACE__",
+        "agreements": "__REPLACE__",
+        "exports": "__REPLACE__"
+      }
+    }
+  }
+}
