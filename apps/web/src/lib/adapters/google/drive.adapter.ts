@@ -1,44 +1,31 @@
+import "server-only";
 import { google } from "googleapis";
-import fs from "fs";
-
-interface DriveConfig {
-  rootFolderId: string;
-  folders: Record<string, string>;
-}
+import { Readable } from "stream";
+import { getGoogleJwt } from "./auth";
 
 export class GoogleDriveAdapter {
   private drive;
-  private folders;
+  private folders: Record<string, string>;
 
-  constructor(config: DriveConfig) {
-    const keyPath = process.env.GOOGLE_SERVICE_ACCOUNT_JSON;
-    if (!keyPath) {
-      throw new Error("GOOGLE_SERVICE_ACCOUNT_JSON not set");
-    }
-
-    const credentials = JSON.parse(fs.readFileSync(keyPath, "utf-8"));
-
-    const auth = new google.auth.JWT(
-      credentials.client_email,
-      undefined,
-      credentials.private_key,
-      ["https://www.googleapis.com/auth/drive"]
-    );
-
+  constructor(folders: Record<string, string>) {
+    const auth = getGoogleJwt(["https://www.googleapis.com/auth/drive"]);
     this.drive = google.drive({ version: "v3", auth });
-    this.folders = config.folders;
+    this.folders = folders;
   }
 
-  async uploadFile(
+  private folderId(logical: string) {
+    const id = this.folders[logical];
+    if (!id) throw new Error(`Drive folder mapping missing for ${logical}`);
+    return id;
+  }
+
+  async uploadBuffer(
     logicalFolder: string,
     filename: string,
     mimeType: string,
     buffer: Buffer
-  ): Promise<string> {
-    const folderId = this.folders[logicalFolder];
-    if (!folderId) {
-      throw new Error(`Drive folder not mapped: ${logicalFolder}`);
-    }
+  ): Promise<{ fileId: string; webViewLink?: string }> {
+    const folderId = this.folderId(logicalFolder);
 
     const res = await this.drive.files.create({
       requestBody: {
@@ -47,10 +34,11 @@ export class GoogleDriveAdapter {
       },
       media: {
         mimeType,
-        body: buffer
-      }
+        body: Readable.from(buffer)
+      },
+      fields: "id, webViewLink"
     });
 
-    return res.data.id!;
+    return { fileId: String(res.data.id), webViewLink: res.data.webViewLink || undefined };
   }
 }
