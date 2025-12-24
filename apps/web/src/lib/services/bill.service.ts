@@ -1,8 +1,9 @@
 import { getAdapters } from "../adapters";
+import { Bill } from "../types/bill";
 
 export class BillService {
-  async recordBill(data: any[]) {
+  async generate(bill: Bill) {
     const { sheets } = getAdapters();
-    await sheets.appendRow("bills", data);
+    await sheets.appendRow("bills", Object.values(bill));
   }
 }
