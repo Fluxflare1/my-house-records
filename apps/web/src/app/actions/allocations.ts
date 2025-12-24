@@ -3,18 +3,16 @@
 import { getAdapters } from "@/lib/adapters";
 import { generateId } from "@/lib/utils/id";
 import { nowISO } from "@/lib/utils/time";
+import { requireAdmin } from "@/lib/auth/guards";
 
-/**
- * Allocation rule:
- * - Must allocate to either rent_id OR bill_id (never neither).
- * - Rent and Bill are separate ledgers.
- */
 export async function allocatePayment(input: {
   paymentId: string;
   amountApplied: number;
   rentId?: string;
   billId?: string;
 }) {
+  await requireAdmin();
+
   if (!input.rentId && !input.billId) {
     throw new Error("Allocation must target either rentId or billId");
   }
