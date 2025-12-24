@@ -4,8 +4,11 @@ import { getAdapters } from "@/lib/adapters";
 import { generateId } from "@/lib/utils/id";
 import { nowISO } from "@/lib/utils/time";
 import { assertNoActiveOccupancyOverlap } from "@/lib/domain/validators";
+import { requireAdmin } from "@/lib/auth/guards";
 
 export async function createProperty(input: { name: string; address: string }) {
+  await requireAdmin();
+
   const { sheets } = getAdapters();
   const row = {
     property_id: generateId("property"),
@@ -23,6 +26,8 @@ export async function createApartmentType(input: {
   yearlyRentAmount: number;
   monthlyChargeAmount: number;
 }) {
+  await requireAdmin();
+
   const { sheets } = getAdapters();
   const row = {
     apartment_type_id: generateId("apt_type"),
@@ -41,6 +46,8 @@ export async function createApartment(input: {
   apartmentTypeId: string;
   unitLabel: string;
 }) {
+  await requireAdmin();
+
   const { sheets } = getAdapters();
   const row = {
     apartment_id: generateId("apt"),
@@ -59,6 +66,8 @@ export async function createTenant(input: {
   phone: string;
   email?: string;
 }) {
+  await requireAdmin();
+
   const { sheets } = getAdapters();
   const row = {
     tenant_id: generateId("tenant"),
@@ -72,14 +81,13 @@ export async function createTenant(input: {
   return row;
 }
 
-/**
- * Bond tenant to apartment (creates occupancy) with strict overlap validation.
- */
 export async function bondOccupancy(input: {
   apartmentId: string;
   tenantId: string;
-  startDate: string; // YYYY-MM-DD recommended
+  startDate: string;
 }) {
+  await requireAdmin();
+
   const { sheets } = getAdapters();
 
   const existing = await sheets.getAll("occupancies");
@@ -104,6 +112,8 @@ export async function bondOccupancy(input: {
 }
 
 export async function endOccupancy(input: { occupancyId: string; endDate: string }) {
+  await requireAdmin();
+
   const { sheets } = getAdapters();
   await sheets.updateRow("occupancies", "occupancy_id", input.occupancyId, {
     end_date: input.endDate,
