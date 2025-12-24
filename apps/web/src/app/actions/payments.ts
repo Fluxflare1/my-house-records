@@ -3,15 +3,13 @@
 import { getAdapters } from "@/lib/adapters";
 import { generateId } from "@/lib/utils/id";
 import { nowISO } from "@/lib/utils/time";
+import { notifyTenantByPayment } from "@/lib/notifications/notify-helpers";
+import { paymentStatusText } from "@/lib/notifications/templates";
 
-/**
- * Record payment (verification remains manual).
- * If a receipt file is provided, upload it to Drive (receipts folder) server-side.
- */
 export async function recordPayment(input: {
   apartmentId: string;
   tenantId?: string;
-  paymentDate: string; // YYYY-MM-DD or ISO
+  paymentDate: string;
   amount: number;
   posReference?: string;
 }) {
@@ -31,15 +29,11 @@ export async function recordPayment(input: {
   return row;
 }
 
-/**
- * Upload receipt and attach it to an existing payment.
- * This keeps payment record stable and allows late uploads.
- */
 export async function uploadPaymentReceipt(input: {
   paymentId: string;
   filename: string;
   mimeType: string;
-  base64: string; // UI will send base64 later (server action)
+  base64: string;
 }) {
   const { sheets, drive } = getAdapters();
   const buffer = Buffer.from(input.base64, "base64");
@@ -52,9 +46,6 @@ export async function uploadPaymentReceipt(input: {
   return { paymentId: input.paymentId, receipt: uploaded.webViewLink ?? uploaded.fileId };
 }
 
-/**
- * Admin verification.
- */
 export async function setPaymentVerification(input: {
   paymentId: string;
   status: "verified" | "rejected";
@@ -63,5 +54,12 @@ export async function setPaymentVerification(input: {
   await sheets.updateRow("payments", "payment_id", input.paymentId, {
     verification_status: input.status
   });
+
+  await notifyTenantByPayment({
+    paymentId: input.paymentId,
+    subject: "Payment Status Updated",
+    text: paymentStatusText({ status: input.status })
+  });
+
   return input;
 }
