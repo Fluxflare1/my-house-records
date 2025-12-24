@@ -12,6 +12,8 @@ import { RentService } from "@/lib/services/rent.service";
 import { BillService } from "@/lib/services/bill.service";
 import { PaymentService } from "@/lib/services/payment.service";
 import { AllocationService } from "@/lib/services/allocation.service";
+import { NotificationService } from "@/lib/notifications/notification.service";
+import { LookupService } from "@/lib/services/lookup.service";
 
 export async function createPropertyAction(input: { name: string; address: string }) {
   const svc = new PropertyService();
@@ -108,6 +110,28 @@ export async function generateRentAction(input: {
     status: "unpaid",
     created_at: nowISO(),
   });
+
+  // Notification after rent generation
+  const lookup = new LookupService();
+  const notif = new NotificationService();
+
+  const occ = await lookup.getOccupancyById(input.occupancyId);
+  if (occ) {
+    const tenant = await lookup.getTenantById(String(occ.tenant_id));
+    if (tenant?.email) {
+      await notif.notifyEmail(
+        String(tenant.email),
+        "New Rent Posted",
+        `A new rent has been posted for your apartment. Amount: ${input.amount}. Due: ${input.dueDate}.`
+      );
+    }
+    if (tenant?.phone) {
+      await notif.notifyWhatsApp(
+        String(tenant.phone),
+        `New rent posted. Amount: ${input.amount}. Due: ${input.dueDate}.`
+      );
+    }
+  }
 }
 
 export async function generateBillAction(input: {
@@ -130,6 +154,28 @@ export async function generateBillAction(input: {
     status: "unpaid",
     created_at: nowISO(),
   });
+
+  // Notification after bill generation
+  const lookup = new LookupService();
+  const notif = new NotificationService();
+
+  const occ = await lookup.getOccupancyById(input.occupancyId);
+  if (occ) {
+    const tenant = await lookup.getTenantById(String(occ.tenant_id));
+    if (tenant?.email) {
+      await notif.notifyEmail(
+        String(tenant.email),
+        "New Monthly Charges Posted",
+        `New monthly charges have been posted for your apartment. Amount: ${input.amount}. Due: ${input.dueDate}.`
+      );
+    }
+    if (tenant?.phone) {
+      await notif.notifyWhatsApp(
+        String(tenant.phone),
+        `New monthly charges posted. Amount: ${input.amount}. Due: ${input.dueDate}.`
+      );
+    }
+  }
 }
 
 export async function recordPaymentAction(input: {
