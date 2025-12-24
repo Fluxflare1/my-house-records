@@ -3,18 +3,16 @@
 import { getAdapters } from "@/lib/adapters";
 import { generateId } from "@/lib/utils/id";
 import { nowISO } from "@/lib/utils/time";
+import { notifyTenantByOccupancy } from "@/lib/notifications/notify-helpers";
+import { rentCreatedText } from "@/lib/notifications/templates";
 
-/**
- * Rent is NOT a bill.
- * This writes to the "rents" table only.
- */
 export async function createRent(input: {
   apartmentId: string;
   occupancyId: string;
-  rentPeriodStart: string; // YYYY-MM-DD or ISO
-  rentPeriodEnd: string;   // YYYY-MM-DD or ISO
+  rentPeriodStart: string;
+  rentPeriodEnd: string;
   expectedAmount: number;
-  dueDate: string;         // YYYY-MM-DD or ISO
+  dueDate: string;
 }) {
   const { sheets } = getAdapters();
   const row = {
@@ -29,5 +27,12 @@ export async function createRent(input: {
     created_at: nowISO()
   };
   await sheets.appendRow("rents", Object.values(row));
+
+  await notifyTenantByOccupancy({
+    occupancyId: input.occupancyId,
+    subject: "New Rent Posted",
+    text: rentCreatedText({ amount: input.expectedAmount, dueDate: input.dueDate })
+  });
+
   return row;
 }
