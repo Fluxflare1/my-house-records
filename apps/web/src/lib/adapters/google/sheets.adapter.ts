@@ -1,101 +1,88 @@
+import "server-only";
 import { google } from "googleapis";
-import fs from "fs";
-
-interface SheetsConfig {
-  spreadsheetId: string;
-  sheets: Record<string, string>;
-}
+import { getGoogleJwt } from "./auth";
 
 export class GoogleSheetsAdapter {
   private sheets;
-  private spreadsheetId;
-  private sheetMap;
+  private spreadsheetId: string;
+  private map: Record<string, string>;
 
-  constructor(config: SheetsConfig) {
-    const keyPath = process.env.GOOGLE_SERVICE_ACCOUNT_JSON;
-    if (!keyPath) {
-      throw new Error("GOOGLE_SERVICE_ACCOUNT_JSON not set");
-    }
-
-    const credentials = JSON.parse(fs.readFileSync(keyPath, "utf-8"));
-
-    const auth = new google.auth.JWT(
-      credentials.client_email,
-      undefined,
-      credentials.private_key,
-      ["https://www.googleapis.com/auth/spreadsheets"]
-    );
-
+  constructor(spreadsheetId: string, sheetMap: Record<string, string>) {
+    const auth = getGoogleJwt(["https://www.googleapis.com/auth/spreadsheets"]);
     this.sheets = google.sheets({ version: "v4", auth });
-    this.spreadsheetId = config.spreadsheetId;
-    this.sheetMap = config.sheets;
+    this.spreadsheetId = spreadsheetId;
+    this.map = sheetMap;
   }
 
-  async appendRow(logicalTable: string, values: any[]) {
-    const sheetName = this.sheetMap[logicalTable];
-    if (!sheetName) {
-      throw new Error(`Sheet mapping not found for ${logicalTable}`);
-    }
+  private sheetName(logical: string) {
+    const name = this.map[logical];
+    if (!name) throw new Error(`Sheet mapping missing for ${logical}`);
+    return name;
+  }
 
+  async appendRow(logical: string, values: any[]) {
+    const sheet = this.sheetName(logical);
     await this.sheets.spreadsheets.values.append({
       spreadsheetId: this.spreadsheetId,
-      range: `${sheetName}!A1`,
+      range: `${sheet}!A1`,
       valueInputOption: "RAW",
       requestBody: { values: [values] }
     });
   }
-}
 
-
-
-// ADD BELOW existing code in this file
-
-  async getAll(logicalTable: string): Promise<any[]> {
-    const sheetName = this.sheetMap[logicalTable];
-    if (!sheetName) throw new Error(`Sheet mapping not found for ${logicalTable}`);
-
+  async getAll(logical: string): Promise<Record<string, any>[]> {
+    const sheet = this.sheetName(logical);
     const res = await this.sheets.spreadsheets.values.get({
       spreadsheetId: this.spreadsheetId,
-      range: `${sheetName}!A1:Z`
+      range: `${sheet}!A1:Z`
     });
 
     const rows = res.data.values || [];
     if (rows.length < 2) return [];
 
     const headers = rows[0];
-    return rows.slice(1).map(row =>
-      Object.fromEntries(headers.map((h, i) => [h, row[i] ?? null]))
-    );
+    return rows.slice(1).map((row) => {
+      const obj: Record<string, any> = {};
+      headers.forEach((h, i) => (obj[String(h)] = row[i] ?? null));
+      return obj;
+    });
   }
 
   async updateRow(
-    logicalTable: string,
+    logical: string,
     matchKey: string,
     matchValue: string,
     updates: Record<string, any>
   ) {
-    const sheetName = this.sheetMap[logicalTable];
-    if (!sheetName) throw new Error(`Sheet mapping not found for ${logicalTable}`);
+    const sheet = this.sheetName(logical);
 
     const res = await this.sheets.spreadsheets.values.get({
       spreadsheetId: this.spreadsheetId,
-      range: `${sheetName}!A1:Z`
+      range: `${sheet}!A1:Z`
     });
 
     const rows = res.data.values || [];
-    const headers = rows[0];
+    if (rows.length === 0) throw new Error("Sheet is empty");
+
+    const headers = rows[0].map(String);
     const keyIndex = headers.indexOf(matchKey);
-    if (keyIndex === -1) throw new Error(`Key ${matchKey} not found`);
+    if (keyIndex === -1) throw new Error(`Column ${matchKey} not found`);
 
-    const rowIndex = rows.findIndex((r, i) => i > 0 && r[keyIndex] === matchValue);
-    if (rowIndex === -1) throw new Error(`Row not found`);
+    const rowIndex = rows.findIndex(
+      (r, i) => i > 0 && String(r[keyIndex] ?? "") === String(matchValue)
+    );
+    if (rowIndex === -1) throw new Error(`Row not found for ${matchValue}`);
 
-    const updatedRow = headers.map(h => updates[h] ?? rows[rowIndex][headers.indexOf(h)] ?? "");
+    const current = rows[rowIndex] || [];
+    const updated = headers.map((h, i) =>
+      updates[h] !== undefined ? String(updates[h]) : String(current[i] ?? "")
+    );
 
     await this.sheets.spreadsheets.values.update({
       spreadsheetId: this.spreadsheetId,
-      range: `${sheetName}!A${rowIndex + 1}`,
+      range: `${sheet}!A${rowIndex + 1}`,
       valueInputOption: "RAW",
-      requestBody: { values: [updatedRow] }
+      requestBody: { values: [updated] }
     });
   }
+}
