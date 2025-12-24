@@ -45,3 +45,57 @@ export class GoogleSheetsAdapter {
     });
   }
 }
+
+
+
+// ADD BELOW existing code in this file
+
+  async getAll(logicalTable: string): Promise<any[]> {
+    const sheetName = this.sheetMap[logicalTable];
+    if (!sheetName) throw new Error(`Sheet mapping not found for ${logicalTable}`);
+
+    const res = await this.sheets.spreadsheets.values.get({
+      spreadsheetId: this.spreadsheetId,
+      range: `${sheetName}!A1:Z`
+    });
+
+    const rows = res.data.values || [];
+    if (rows.length < 2) return [];
+
+    const headers = rows[0];
+    return rows.slice(1).map(row =>
+      Object.fromEntries(headers.map((h, i) => [h, row[i] ?? null]))
+    );
+  }
+
+  async updateRow(
+    logicalTable: string,
+    matchKey: string,
+    matchValue: string,
+    updates: Record<string, any>
+  ) {
+    const sheetName = this.sheetMap[logicalTable];
+    if (!sheetName) throw new Error(`Sheet mapping not found for ${logicalTable}`);
+
+    const res = await this.sheets.spreadsheets.values.get({
+      spreadsheetId: this.spreadsheetId,
+      range: `${sheetName}!A1:Z`
+    });
+
+    const rows = res.data.values || [];
+    const headers = rows[0];
+    const keyIndex = headers.indexOf(matchKey);
+    if (keyIndex === -1) throw new Error(`Key ${matchKey} not found`);
+
+    const rowIndex = rows.findIndex((r, i) => i > 0 && r[keyIndex] === matchValue);
+    if (rowIndex === -1) throw new Error(`Row not found`);
+
+    const updatedRow = headers.map(h => updates[h] ?? rows[rowIndex][headers.indexOf(h)] ?? "");
+
+    await this.sheets.spreadsheets.values.update({
+      spreadsheetId: this.spreadsheetId,
+      range: `${sheetName}!A${rowIndex + 1}`,
+      valueInputOption: "RAW",
+      requestBody: { values: [updatedRow] }
+    });
+  }
