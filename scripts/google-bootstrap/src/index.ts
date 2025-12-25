@@ -11,7 +11,6 @@ type BootstrapResult = {
 };
 
 function loadEnv() {
-  // Load scripts/google-bootstrap/.env
   dotenv.config({ path: path.resolve(process.cwd(), ".env") });
 }
 
@@ -22,21 +21,27 @@ function requireEnv(name: string) {
 }
 
 async function findOrCreateFolder(drive: any, name: string, parentId?: string) {
-  const qParts = [
-    `mimeType='application/vnd.google-apps.folder'`,
-    `name='${name.replace(/'/g, "\\'")}'`,
-    "trashed=false"
-  ];
-  if (parentId) qParts.push(`'${parentId}' in parents`);
+  // Drive "list" can fail on some accounts; but folder creation also needs permission.
+  // We'll still attempt list first (fast), if list fails, fallback to create.
+  try {
+    const qParts = [
+      `mimeType='application/vnd.google-apps.folder'`,
+      `name='${name.replace(/'/g, "\\'")}'`,
+      "trashed=false"
+    ];
+    if (parentId) qParts.push(`'${parentId}' in parents`);
 
-  const res = await drive.files.list({
-    q: qParts.join(" and "),
-    fields: "files(id,name)",
-    spaces: "drive"
-  });
+    const res = await drive.files.list({
+      q: qParts.join(" and "),
+      fields: "files(id,name)",
+      spaces: "drive"
+    });
 
-  const existing = res.data.files?.[0];
-  if (existing?.id) return existing.id;
+    const existing = res.data.files?.[0];
+    if (existing?.id) return existing.id;
+  } catch {
+    // ignore and fall through to create
+  }
 
   const created = await drive.files.create({
     requestBody: {
@@ -51,31 +56,35 @@ async function findOrCreateFolder(drive: any, name: string, parentId?: string) {
   return created.data.id;
 }
 
-async function findOrCreateSpreadsheet(drive: any, sheets: any, name: string) {
-  // Try to find existing spreadsheet by name via Drive
-  const res = await drive.files.list({
-    q: [
-      `mimeType='application/vnd.google-apps.spreadsheet'`,
-      `name='${name.replace(/'/g, "\\'")}'`,
-      "trashed=false"
-    ].join(" and "),
-    fields: "files(id,name)"
-  });
-
-  const existing = res.data.files?.[0];
-  if (existing?.id) return existing.id;
-
-  // Create new spreadsheet
-  const created = await sheets.spreadsheets.create({
-    requestBody: {
-      properties: { title: name }
-    },
+/**
+ * Safer: Create spreadsheet using Sheets API (does not require Drive file search/list),
+ * then optionally move it into the given Drive folder.
+ */
+async function createSpreadsheetViaSheets(sheetsApi: any, title: string) {
+  const created = await sheetsApi.spreadsheets.create({
+    requestBody: { properties: { title } },
     fields: "spreadsheetId"
   });
 
   const id = created.data.spreadsheetId;
-  if (!id) throw new Error("Failed to create spreadsheet");
+  if (!id) throw new Error("Failed to create spreadsheet via Sheets API");
   return id;
+}
+
+async function moveFileIntoFolder(drive: any, fileId: string, folderId: string) {
+  // Move file into folder by updating parents
+  const current = await drive.files.get({
+    fileId,
+    fields: "parents"
+  });
+
+  const prevParents = (current.data.parents || []).join(",");
+  await drive.files.update({
+    fileId,
+    addParents: folderId,
+    removeParents: prevParents || undefined,
+    fields: "id, parents"
+  });
 }
 
 async function ensureSheetsAndHeaders(sheetsApi: any, spreadsheetId: string) {
@@ -102,7 +111,6 @@ async function ensureSheetsAndHeaders(sheetsApi: any, spreadsheetId: string) {
     });
   }
 
-  // Write headers (A1 row) for each sheet
   for (const spec of SHEETS) {
     await sheetsApi.spreadsheets.values.update({
       spreadsheetId,
@@ -127,15 +135,15 @@ function maybeWriteRuntimeConfig(result: BootstrapResult) {
 
   const config = JSON.parse(fs.readFileSync(resolved, "utf-8"));
 
-  if (!config.google) config.google = {};
-  if (!config.google.sheets) config.google.sheets = {};
-  if (!config.google.drive) config.google.drive = {};
-
   config.backend = "google";
-  config.google.sheets.spreadsheetId = result.spreadsheetId;
-
-  config.google.drive.rootFolderId = result.rootFolderId;
+  config.google = config.google || {};
+  config.google.sheets = config.google.sheets || {};
+  config.google.drive = config.google.drive || {};
   config.google.drive.folders = config.google.drive.folders || {};
+
+  config.google.sheets.spreadsheetId = result.spreadsheetId;
+  config.google.drive.rootFolderId = result.rootFolderId;
+
   for (const [k, v] of Object.entries(result.folders)) {
     config.google.drive.folders[k] = v;
   }
@@ -152,19 +160,27 @@ async function main() {
 
   const { drive, sheets } = getGoogleClients();
 
-  // 1) Drive: create/reuse root folder
+  // 1) Create / reuse root folder (Drive)
   const rootFolderId = await findOrCreateFolder(drive, ROOT_FOLDER_NAME);
 
-  // 2) Drive: create/reuse subfolders
+  // 2) Create / reuse subfolders (Drive)
   const folders: Record<string, string> = {};
   for (const f of DRIVE_FOLDERS) {
     folders[f] = await findOrCreateFolder(drive, f, rootFolderId);
   }
 
-  // 3) Spreadsheet: create/reuse
-  const spreadsheetId = await findOrCreateSpreadsheet(drive, sheets, SPREADSHEET_NAME);
+  // 3) Create spreadsheet via Sheets API (safer than Drive search/list)
+  const spreadsheetId = await createSpreadsheetViaSheets(sheets, SPREADSHEET_NAME);
 
-  // 4) Ensure tabs + headers
+  // 4) Attempt to move spreadsheet into root folder (Drive). If it fails, continue.
+  try {
+    await moveFileIntoFolder(drive, spreadsheetId, rootFolderId);
+  } catch (e) {
+    console.warn("\n⚠ Could not move spreadsheet into the Drive folder. This is OK.");
+    console.warn("   Spreadsheet was still created successfully.");
+  }
+
+  // 5) Ensure tabs + headers
   await ensureSheetsAndHeaders(sheets, spreadsheetId);
 
   const result: BootstrapResult = { spreadsheetId, rootFolderId, folders };
@@ -173,7 +189,6 @@ async function main() {
   console.log("\n--- Copy these into apps/web/config/runtime-config.json ---");
   console.log(JSON.stringify(result, null, 2));
 
-  // Optional: write runtime config automatically if APP_CONFIG_PATH is provided
   maybeWriteRuntimeConfig(result);
 }
 
