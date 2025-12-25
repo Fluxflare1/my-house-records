@@ -1,3 +1,4 @@
+apps/web/src/app/admin/layout.tsx
 "use client";
 
 import Link from "next/link";
@@ -56,10 +57,12 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
       try {
         const r = await getAdminMe();
         if (!alive) return;
-        setMe(r);
+        setMe(r); // r can be null if not logged in
+        setError("");
       } catch (e: any) {
         if (!alive) return;
         setError(e?.message || "Failed to load admin session");
+        setMe(null);
       } finally {
         if (alive) setLoading(false);
       }
