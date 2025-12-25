@@ -1,9 +1,10 @@
-apps/web/src/app/admin/layout.tsx
 "use client";
 
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { useEffect, useMemo, useState } from "react";
+import { usePathname } from "next/navigation";
+
 import { getAdminMe } from "@/app/actions/admin-me";
 import { PERMS } from "@/lib/auth/permissions";
 
@@ -36,70 +37,102 @@ const NAV: NavItem[] = [
   { href: "/admin/admin-users", label: "Admin Users", perm: PERMS.MANAGE_ADMIN_USERS }
 ];
 
-function hasPerm(userPerms: string[], need?: string) {
-  if (!need) return true;
-  if (userPerms.includes("*")) return true;
-  return userPerms.includes(need);
+function hasPerm(perms: string[] | undefined, perm?: string) {
+  if (!perm) return true;
+  if (!perms) return false;
+  return perms.includes(perm);
 }
 
 export default function AdminLayout({ children }: { children: ReactNode }) {
-  const [me, setMe] = useState<{ fullName: string; email: string; permissions: string[] } | null>(null);
+  const pathname = usePathname();
+
+  const [loading, setLoading] = useState(true);
+  const [me, setMe] = useState<{ email?: string; fullName?: string; role?: string; permissions?: string[] } | null>(null);
+  const [error, setError] = useState<string>("");
 
   useEffect(() => {
+    let alive = true;
     (async () => {
       try {
-        const x = await getAdminMe();
-        setMe({ fullName: x.fullName, email: x.email, permissions: x.permissions || [] });
-      } catch {
-        // middleware will redirect to /admin/login if missing session
+        const r = await getAdminMe();
+        if (!alive) return;
+        setMe(r);
+      } catch (e: any) {
+        if (!alive) return;
+        setError(e?.message || "Failed to load admin session");
+      } finally {
+        if (alive) setLoading(false);
       }
     })();
+    return () => {
+      alive = false;
+    };
   }, []);
 
   const visibleNav = useMemo(() => {
     const perms = me?.permissions || [];
-    return NAV.filter((i) => hasPerm(perms, i.perm));
+    return NAV.filter((n) => hasPerm(perms, n.perm));
   }, [me]);
+
+  // If admin session missing, redirect to /admin/login
+  useEffect(() => {
+    if (!loading && (!me || error)) {
+      if (!pathname.startsWith("/admin/login")) {
+        window.location.href = "/admin/login";
+      }
+    }
+  }, [loading, me, error, pathname]);
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="rounded border p-4 text-sm">Loading admin…</div>
+      </div>
+    );
+  }
+
+  if (!me) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="rounded border p-4 text-sm">
+          Admin authentication required. Redirecting…
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-50">
       <header className="border-b bg-white">
-        <div className="mx-auto max-w-6xl px-4 py-4 flex items-center justify-between">
+        <div className="mx-auto max-w-6xl px-4 py-3 flex items-center justify-between gap-3">
           <div className="font-semibold">My House Records — Admin</div>
-
-          <div className="flex items-center gap-3">
-            {me && (
-              <div className="text-xs text-gray-700 text-right">
-                <div className="font-semibold">{me.fullName}</div>
-                <div>{me.email}</div>
-              </div>
-            )}
-            <Link className="text-sm underline" href="/logout">
-              Logout
-            </Link>
+          <div className="text-xs text-gray-600">
+            {me.fullName || me.email || "Admin"} {me.role ? `(${me.role})` : ""}
           </div>
         </div>
       </header>
 
-      <div className="mx-auto max-w-6xl px-4 py-6 grid grid-cols-12 gap-4">
-        <aside className="col-span-12 md:col-span-3">
-          <nav className="rounded border bg-white p-3">
-            <div className="text-xs font-semibold text-gray-600 mb-2">Navigation</div>
-            <ul className="space-y-1">
-              {visibleNav.map((l) => (
-                <li key={l.href}>
-                  <Link className="block rounded px-3 py-2 text-sm hover:bg-gray-100" href={l.href}>
-                    {l.label}
-                  </Link>
-                </li>
-              ))}
-            </ul>
+      <div className="mx-auto max-w-6xl px-4 py-6 grid grid-cols-1 md:grid-cols-[240px_1fr] gap-4">
+        <aside className="rounded border bg-white p-3 h-fit">
+          <nav className="space-y-1">
+            {visibleNav.map((item) => {
+              const active = pathname === item.href || pathname.startsWith(item.href + "/");
+              return (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  className={`block rounded px-3 py-2 text-sm ${
+                    active ? "bg-black text-white" : "hover:bg-gray-100"
+                  }`}
+                >
+                  {item.label}
+                </Link>
+              );
+            })}
           </nav>
         </aside>
 
-        <main className="col-span-12 md:col-span-9">
-          <div className="rounded border bg-white p-4">{children}</div>
-        </main>
+        <main className="rounded border bg-white p-4">{children}</main>
       </div>
     </div>
   );
