@@ -1,3 +1,4 @@
+apps/web/src/app/admin/layout.tsx
 "use client";
 
 import Link from "next/link";
@@ -15,13 +16,19 @@ const NAV: NavItem[] = [
   { href: "/admin/occupancy", label: "Occupancy", perm: PERMS.MANAGE_OCCUPANCY },
 
   { href: "/admin/rent", label: "Rent", perm: PERMS.MANAGE_RENT },
+  { href: "/admin/rent/generate", label: "Generate Rent", perm: PERMS.MANAGE_RENT },
+
   { href: "/admin/bills", label: "Bills", perm: PERMS.MANAGE_BILLS },
+  { href: "/admin/bills/generate", label: "Generate Bills", perm: PERMS.MANAGE_BILLS },
 
   { href: "/admin/payments", label: "Payments", perm: PERMS.MANAGE_PAYMENTS },
   { href: "/admin/verification-queue", label: "Verification Queue", perm: PERMS.VERIFY_PAYMENTS },
 
   { href: "/admin/allocations", label: "Allocations", perm: PERMS.MANAGE_ALLOCATIONS },
+  { href: "/admin/allocations/suggest", label: "Suggest Allocations", perm: PERMS.MANAGE_ALLOCATIONS },
+
   { href: "/admin/statements", label: "Statements", perm: PERMS.VIEW_STATEMENTS },
+  { href: "/admin/statements/apartment", label: "Apartment Statement", perm: PERMS.VIEW_STATEMENTS },
 
   { href: "/admin/reminders", label: "Reminders", perm: PERMS.MANAGE_REMINDERS },
   { href: "/admin/settings", label: "Settings", perm: PERMS.MANAGE_SETTINGS },
