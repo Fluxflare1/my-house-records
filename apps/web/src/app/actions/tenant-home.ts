@@ -18,6 +18,10 @@ function firstName(fullName: string) {
   return parts[0] || fullName || "Tenant";
 }
 
+function isTrue(v: string) {
+  return v.toLowerCase() === "true";
+}
+
 async function safeGetAll(sheets: any, table: string): Promise<Row[]> {
   try {
     return (await sheets.getAll(table)) as Row[];
@@ -59,7 +63,6 @@ export async function getTenantHomeData() {
   const tenant = tenants.find((t) => s(t.tenant_id) === s(tenantId)) || {};
   const name = s(tenant.full_name) || s(tenantId);
 
-  // Current active occupancy (pick latest start_date if multiple)
   const activeOccs = occupancies
     .filter((o) => s(o.tenant_id) === s(tenantId))
     .filter((o) => s(o.status).toLowerCase() === "active" && !s(o.end_date))
@@ -68,7 +71,6 @@ export async function getTenantHomeData() {
 
   const currentOcc = activeOccs[0] || null;
 
-  // Apartment + Property + Type details
   const apartment = currentOcc
     ? apartments.find((a) => s(a.apartment_id) === s(currentOcc.apartment_id)) || null
     : null;
@@ -92,7 +94,7 @@ export async function getTenantHomeData() {
     startDate: s(currentOcc.start_date)
   } : null;
 
-  // Compute balances for THIS tenant across all their occupancies (history-aware)
+  // Balance compute (history-aware)
   const tenantOccIds = new Set(
     occupancies
       .filter((o) => s(o.tenant_id) === s(tenantId))
@@ -101,7 +103,6 @@ export async function getTenantHomeData() {
 
   const tenantRents = rents.filter((r) => tenantOccIds.has(s(r.occupancy_id)));
   const tenantBills = bills.filter((b) => tenantOccIds.has(s(b.occupancy_id)));
-  const tenantPayments = payments.filter((p) => s(p.tenant_id) === s(tenantId));
 
   const rentApplied = new Map<string, number>();
   const billApplied = new Map<string, number>();
@@ -124,7 +125,7 @@ export async function getTenantHomeData() {
 
   const totalBalance = rentBalance + billBalance;
 
-  // Settings (key/value)
+  // Settings
   const settings = new Map<string, string>();
   for (const row of settingsRows) {
     const k = s(row.key);
@@ -132,11 +133,18 @@ export async function getTenantHomeData() {
     if (k) settings.set(k, v);
   }
 
-  const paymentDetails = {
+  const published = isTrue(s(settings.get("tenant_payment_details_published") || "false"));
+
+  const paymentDetails = published ? {
     accountName: settings.get("payment_account_name") || "",
     accountNumber: settings.get("payment_account_number") || "",
     bankName: settings.get("payment_bank_name") || "",
     note: settings.get("payment_note") || ""
+  } : {
+    accountName: "",
+    accountNumber: "",
+    bankName: "",
+    note: ""
   };
 
   const adminContact = {
@@ -150,12 +158,9 @@ export async function getTenantHomeData() {
     tenantName: name,
     tenantFirstName: firstName(name),
     apartmentDetails,
-    balances: {
-      rentBalance,
-      billBalance,
-      totalBalance
-    },
+    balances: { rentBalance, billBalance, totalBalance },
     paymentDetails,
+    paymentDetailsPublished: published,
     adminContact
   };
 }
