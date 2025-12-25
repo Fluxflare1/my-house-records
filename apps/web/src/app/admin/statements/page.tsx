@@ -1,27 +1,58 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { getApartmentStatement, getTenantStatement } from "@/app/actions/statements";
 import { getReferenceData, RefOption } from "@/app/actions/reference";
 import { computeSummary } from "@/lib/utils/statement-summary";
+import { SearchableSelect } from "@/components/common/SearchableSelect";
+
+type RefData = {
+  properties: RefOption[];
+  apartments: RefOption[];
+  tenants: RefOption[];
+};
 
 export default function AdminStatementsPage() {
-  const [apartments, setApartments] = useState<RefOption[]>([]);
-  const [tenants, setTenants] = useState<RefOption[]>([]);
+  const [ref, setRef] = useState<RefData>({ properties: [], apartments: [], tenants: [] });
+
+  const [mode, setMode] = useState<"apartment" | "tenant">("apartment");
+  const [propertyId, setPropertyId] = useState(""); // filter only
   const [apartmentId, setApartmentId] = useState("");
   const [tenantId, setTenantId] = useState("");
+
   const [result, setResult] = useState<any>(null);
-  const [mode, setMode] = useState<"apartment" | "tenant">("apartment");
+  const [loading, setLoading] = useState(true);
 
   async function loadRefs() {
-    const ref = await getReferenceData();
-    setApartments(ref.apartments);
-    setTenants(ref.tenants);
+    setLoading(true);
+    try {
+      const r = await getReferenceData();
+      setRef({ properties: r.properties, apartments: r.apartments, tenants: r.tenants });
+    } finally {
+      setLoading(false);
+    }
   }
 
   useEffect(() => {
     loadRefs();
   }, []);
+
+  const propertyOptions = useMemo(
+    () => [{ value: "", label: "All properties" }].concat(ref.properties.map(p => ({ value: p.id, label: p.label }))),
+    [ref.properties]
+  );
+
+  // We don't have apartment->property label in reference list; so filter is UX-only placeholder for now.
+  // (In a later step, we can return richer apartment refs including property_id.)
+  const apartmentOptions = useMemo(
+    () => ref.apartments.map(a => ({ value: a.id, label: a.label })),
+    [ref.apartments]
+  );
+
+  const tenantOptions = useMemo(
+    () => ref.tenants.map(t => ({ value: t.id, label: t.label })),
+    [ref.tenants]
+  );
 
   async function fetchStatement() {
     if (mode === "apartment") {
@@ -30,7 +61,6 @@ export default function AdminStatementsPage() {
       setResult(data);
       return;
     }
-
     if (!tenantId) return alert("Select a tenant");
     const data = await getTenantStatement(tenantId);
     setResult(data);
@@ -53,42 +83,59 @@ export default function AdminStatementsPage() {
                 setMode(e.target.value as any);
                 setResult(null);
               }}
+              disabled={loading}
             >
               <option value="apartment">Apartment</option>
               <option value="tenant">Tenant</option>
             </select>
           </div>
 
+          <SearchableSelect
+            label="Property Filter (optional)"
+            value={propertyId}
+            onChange={setPropertyId}
+            options={propertyOptions}
+            placeholder="All properties"
+            disabled={loading}
+            searchPlaceholder="Search properties..."
+          />
+
           {mode === "apartment" ? (
-            <div className="space-y-1 sm:col-span-2">
-              <label className="text-sm">Apartment</label>
-              <select className="w-full border p-2" value={apartmentId} onChange={(e) => setApartmentId(e.target.value)}>
-                <option value="">Select apartment</option>
-                {apartments.map((a) => (
-                  <option key={a.id} value={a.id}>
-                    {a.label}
-                  </option>
-                ))}
-              </select>
-            </div>
+            <SearchableSelect
+              label="Apartment"
+              value={apartmentId}
+              onChange={setApartmentId}
+              options={apartmentOptions}
+              placeholder="Select apartment"
+              disabled={loading}
+              searchPlaceholder="Search apartments..."
+            />
           ) : (
-            <div className="space-y-1 sm:col-span-2">
-              <label className="text-sm">Tenant</label>
-              <select className="w-full border p-2" value={tenantId} onChange={(e) => setTenantId(e.target.value)}>
-                <option value="">Select tenant</option>
-                {tenants.map((t) => (
-                  <option key={t.id} value={t.id}>
-                    {t.label}
-                  </option>
-                ))}
-              </select>
-            </div>
+            <SearchableSelect
+              label="Tenant"
+              value={tenantId}
+              onChange={setTenantId}
+              options={tenantOptions}
+              placeholder="Select tenant"
+              disabled={loading}
+              searchPlaceholder="Search tenants..."
+            />
           )}
         </div>
 
         <button className="rounded bg-black px-4 py-2 text-white" onClick={fetchStatement}>
           Get Statement
         </button>
+
+        <button className="rounded border px-4 py-2 text-sm" onClick={loadRefs}>
+          Refresh Lists
+        </button>
+
+        {propertyId && (
+          <div className="text-xs text-gray-600">
+            Property filter is currently informational only (full filtering will be enabled when apartment reference data includes property_id).
+          </div>
+        )}
       </section>
 
       {result && summary && (
