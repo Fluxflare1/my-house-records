@@ -1,24 +1,25 @@
 import "./globals.css";
+import type { ReactNode } from "react";
+import SiteHeader from "@/components/site/site-header";
+import SiteFooter from "@/components/site/site-footer";
 
 export const metadata = {
-  title: "My House Records",
-  description: "Rent, bills, payments, statements and receipt tracking.",
-  manifest: "/manifest.webmanifest"
+  title: "My House",
+  description: "Manage occupancy, rent, bills, payments, receipts and statements."
 };
 
 export const viewport = {
-  themeColor: "#000000"
+  themeColor: "#0a0a0a"
 };
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="en">
-      <head>
-        <link rel="manifest" href="/manifest.webmanifest" />
-        <link rel="apple-touch-icon" href="/icons/icon-192.png" />
-        <meta name="theme-color" content="#000000" />
-      </head>
-      <body>{children}</body>
+      <body className="min-h-screen bg-white text-gray-900">
+        <SiteHeader />
+        <main className="min-h-[calc(100vh-160px)]">{children}</main>
+        <SiteFooter />
+      </body>
     </html>
   );
 }
