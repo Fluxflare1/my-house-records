@@ -1,4 +1,3 @@
-apps/web/src/app/tenant/page.tsx
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
@@ -6,6 +5,8 @@ import Link from "next/link";
 import { getTenantHomeData } from "@/app/actions/tenant-home";
 import { getTenantDashboard } from "@/app/actions/tenant";
 import InstallPWAButton from "@/components/tenant/install-pwa";
+import TenantSplash from "@/components/tenant/tenant-splash";
+import TenantWelcome from "@/components/tenant/tenant-welcome";
 
 function copy(text: string) {
   if (!text) return;
@@ -36,6 +37,9 @@ export default function TenantDashboardSinglePage() {
   const [home, setHome] = useState<any>(null);
   const [dash, setDash] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+
+  // Welcome control
+  const [welcomeDismissed, setWelcomeDismissed] = useState(false);
 
   async function refresh() {
     setLoading(true);
@@ -98,8 +102,6 @@ export default function TenantDashboardSinglePage() {
     const billAppliedSum = bills.reduce((sum: number, b: any) => sum + n(b.applied), 0);
     const billBalance = Math.max(0, bills.reduce((sum: number, b: any) => sum + Math.max(0, n(b.balance)), 0));
 
-    const paymentsTotal = (dash.payments || []).reduce((sum: number, p: any) => sum + n(p.amount), 0);
-
     return {
       rents,
       bills,
@@ -109,8 +111,7 @@ export default function TenantDashboardSinglePage() {
       billExpected,
       billAppliedSum,
       billBalance,
-      totalBalance: rentBalance + billBalance,
-      paymentsTotal
+      totalBalance: rentBalance + billBalance
     };
   }, [dash]);
 
@@ -137,8 +138,9 @@ export default function TenantDashboardSinglePage() {
       .slice(0, 8);
   }, [summary]);
 
+  // Splash while loading initial data
   if (loading && !home) {
-    return <div className="text-sm text-gray-700">Loading...</div>;
+    return <TenantSplash />;
   }
 
   const apt = home?.apartmentDetails;
@@ -148,12 +150,21 @@ export default function TenantDashboardSinglePage() {
 
   return (
     <div className="space-y-6">
+      {/* Welcome screen (first-time only) */}
+      <TenantWelcome
+        tenantFirstName={home?.tenantFirstName}
+        tenantId={home?.tenantId}
+        onContinue={() => setWelcomeDismissed(true)}
+      />
+
       {/* Header */}
       <div className="flex items-start justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-semibold">Welcome, {home?.tenantFirstName}</h1>
+          <h1 className="text-2xl font-semibold">
+            Welcome, {home?.tenantFirstName}
+          </h1>
           <p className="text-sm text-gray-700">
-            Your dashboard shows your current apartment, balances, charges, and payments. Upload receipts after payment.
+            Your dashboard shows your current apartment, balances, charges, and payments.
           </p>
         </div>
 
@@ -211,7 +222,8 @@ export default function TenantDashboardSinglePage() {
         <div className="text-sm font-semibold">Quick Actions</div>
 
         <div className="flex flex-wrap gap-2">
-          <InstallPWAButton /> {/* ✅ Added InstallPWAButton */}
+          <InstallPWAButton />
+
           <Link className="rounded border px-4 py-2 text-sm" href="/tenant/submit-receipt">
             Upload Receipt
           </Link>
@@ -322,7 +334,7 @@ export default function TenantDashboardSinglePage() {
         )}
       </section>
 
-      {/* Payment account details */}
+      {/* Payment account details (published by admin only) */}
       <section className="rounded border bg-white p-4 space-y-2">
         <div className="text-sm font-semibold">Payment Account Details</div>
 
@@ -350,12 +362,12 @@ export default function TenantDashboardSinglePage() {
           </div>
         ) : (
           <div className="text-sm text-gray-700">
-            Payment account details are not set yet. Contact admin.
+            Payment account details are not available. Contact admin.
           </div>
         )}
       </section>
 
-      {/* Technical transparency */}
+      {/* Debug */}
       {dash && (
         <details className="text-sm">
           <summary className="cursor-pointer font-semibold">View Raw Data (JSON)</summary>
