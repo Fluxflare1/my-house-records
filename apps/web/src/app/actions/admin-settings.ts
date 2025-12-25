@@ -1,6 +1,7 @@
 "use server";
 
-import { requireAdmin } from "@/lib/auth/guards";
+import { requireAdminPermission } from "@/lib/auth/guards";
+import { PERMS } from "@/lib/auth/permissions";
 import { getAdapters } from "@/lib/adapters";
 
 type Row = Record<string, any>;
@@ -21,11 +22,11 @@ async function safeGetAll(sheets: any, table: string): Promise<Row[]> {
 export type SettingsKV = { key: string; value: string };
 
 export async function getAllSettings(): Promise<SettingsKV[]> {
-  await requireAdmin();
+  await requireAdminPermission(PERMS.MANAGE_SETTINGS);
+
   const { sheets } = getAdapters();
   const rows = await safeGetAll(sheets, SETTINGS_TABLE);
 
-  // Expect columns: key, value
   const out: SettingsKV[] = [];
   for (const r of rows) {
     const key = s(r.key);
@@ -36,10 +37,10 @@ export async function getAllSettings(): Promise<SettingsKV[]> {
 }
 
 export async function upsertSettingsBulk(items: SettingsKV[]) {
-  await requireAdmin();
+  await requireAdminPermission(PERMS.MANAGE_SETTINGS);
+
   const { sheets } = getAdapters();
 
-  // Read existing
   const existing = await safeGetAll(sheets, SETTINGS_TABLE);
   const existingByKey = new Map<string, Row>();
   for (const r of existing) {
@@ -47,7 +48,6 @@ export async function upsertSettingsBulk(items: SettingsKV[]) {
     if (k) existingByKey.set(k, r);
   }
 
-  // Upsert: update if exists, else append
   for (const it of items) {
     const k = s(it.key);
     const v = s(it.value);
@@ -56,7 +56,6 @@ export async function upsertSettingsBulk(items: SettingsKV[]) {
     if (existingByKey.has(k)) {
       await sheets.updateRow(SETTINGS_TABLE, "key", k, { value: v });
     } else {
-      // Append expects values in sheet column order; our adapter uses Object.values(row)
       await sheets.appendRow(SETTINGS_TABLE, [k, v]);
     }
   }
