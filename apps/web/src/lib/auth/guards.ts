@@ -1,18 +1,26 @@
 import "server-only";
-import { getSession } from "./session";
 
+import { getAdminSession, hasPermission } from "@/lib/auth/admin-session";
+
+/**
+ * Tenant guards remain as they were in your system.
+ * We only add/replace admin guards here.
+ *
+ * If you already have requireTenant() in another file, keep it unchanged.
+ * This file focuses on admin auth.
+ */
 export async function requireAdmin() {
-  const session = await getSession();
-  if (!session.user || session.user.role !== "admin") {
-    throw new Error("Unauthorized: admin only");
+  const session = getAdminSession();
+  if (!session) {
+    throw new Error("ADMIN_AUTH_REQUIRED");
   }
-  return session.user;
+  return session;
 }
 
-export async function requireTenant() {
-  const session = await getSession();
-  if (!session.user || session.user.role !== "tenant") {
-    throw new Error("Unauthorized: tenant only");
+export async function requireAdminPermission(permission: string) {
+  const session = await requireAdmin();
+  if (!hasPermission(session, permission)) {
+    throw new Error("ADMIN_PERMISSION_DENIED");
   }
-  return session.user;
+  return session;
 }
