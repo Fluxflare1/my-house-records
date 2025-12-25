@@ -1,6 +1,7 @@
 "use server";
 
-import { requireAdmin } from "@/lib/auth/guards";
+import { requireAdminPermission } from "@/lib/auth/guards";
+import { PERMS } from "@/lib/auth/permissions";
 import { getAdapters } from "@/lib/adapters";
 
 type Row = Record<string, any>;
@@ -21,7 +22,8 @@ export type QueueItem = {
 };
 
 export async function getVerificationQueue(limit = 50): Promise<QueueItem[]> {
-  await requireAdmin();
+  await requireAdminPermission(PERMS.VERIFY_PAYMENTS);
+
   const { sheets } = getAdapters();
 
   const [payments, apartments, tenants] = await Promise.all([
@@ -31,16 +33,12 @@ export async function getVerificationQueue(limit = 50): Promise<QueueItem[]> {
   ]);
 
   const aptLabel = new Map<string, string>();
-  for (const a of apartments as Row[]) {
-    aptLabel.set(s(a.apartment_id), s(a.unit_label || a.apartment_id));
-  }
+  for (const a of apartments as Row[]) aptLabel.set(s(a.apartment_id), s(a.unit_label || a.apartment_id));
 
   const tenantName = new Map<string, string>();
-  for (const t of tenants as Row[]) {
-    tenantName.set(s(t.tenant_id), s(t.full_name || t.tenant_id));
-  }
+  for (const t of tenants as Row[]) tenantName.set(s(t.tenant_id), s(t.full_name || t.tenant_id));
 
-  const items = (payments as Row[])
+  return (payments as Row[])
     .filter((p) => s(p.verification_status).toLowerCase() === "pending")
     .filter((p) => !!s(p.receipt_drive_file_url).trim())
     .slice()
@@ -64,6 +62,4 @@ export async function getVerificationQueue(limit = 50): Promise<QueueItem[]> {
         createdAt: s(p.created_at || "")
       };
     });
-
-  return items;
 }
