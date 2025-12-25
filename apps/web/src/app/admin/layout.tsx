@@ -4,3 +4,5 @@ import AdminShell from "@/components/admin/admin-shell";
 export default function AdminLayout({ children }: { children: ReactNode }) {
   return <AdminShell>{children}</AdminShell>;
 }
+
+{ href: "/admin/applicants", label: "Applicants", perm: PERMS.MANAGE_OCCUPANCY },
