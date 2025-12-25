@@ -1,6 +1,7 @@
 "use server";
 
-import { requireAdmin } from "@/lib/auth/guards";
+import { requireAdminPermission } from "@/lib/auth/guards";
+import { PERMS } from "@/lib/auth/permissions";
 import { getAdapters } from "@/lib/adapters";
 import { getNotificationPorts } from "@/lib/notifications/dispatcher";
 import { notifyAdmin } from "@/lib/notifications/admin-notify";
@@ -30,7 +31,7 @@ export async function generateDebtorsReport(params?: {
   notifyAdmin?: boolean;
   limit?: number;
 }) {
-  await requireAdmin();
+  await requireAdminPermission(PERMS.MANAGE_REMINDERS);
 
   const notifyTenants = !!params?.notifyTenants;
   const notifyAdminFlag = !!params?.notifyAdmin;
@@ -54,7 +55,6 @@ export async function generateDebtorsReport(params?: {
   const aptMap = new Map<string, Row>();
   for (const a of apartments as Row[]) aptMap.set(s(a.apartment_id), a);
 
-  // Applied amounts
   const rentApplied = new Map<string, number>();
   const billApplied = new Map<string, number>();
   for (const a of allocations as Row[]) {
@@ -65,12 +65,10 @@ export async function generateDebtorsReport(params?: {
     if (bid) billApplied.set(bid, (billApplied.get(bid) ?? 0) + amt);
   }
 
-  // Active occupancies only
   const activeOcc = (occupancies as Row[]).filter(
     (o) => s(o.status).toLowerCase() === "active" && !s(o.end_date).trim()
   );
 
-  // Map occupancy -> tenant/apartment
   const occToTenant = new Map<string, string>();
   const occToApt = new Map<string, string>();
   for (const o of activeOcc) {
@@ -78,7 +76,6 @@ export async function generateDebtorsReport(params?: {
     occToApt.set(s(o.occupancy_id), s(o.apartment_id));
   }
 
-  // Sum balances per (tenant+apartment) for active occupancies
   const key = (tenantId: string, aptId: string) => `${tenantId}::${aptId}`;
   const agg = new Map<string, { tenantId: string; aptId: string; rent: number; bill: number }>();
 
@@ -155,44 +152,29 @@ export async function generateDebtorsReport(params?: {
     return `Debtors (${debtors.length}):\n` + lines.join("\n");
   })();
 
-  // Notify tenants (optional)
   if (notifyTenants) {
-    const tenantMsgPrefix = "Payment Reminder:";
     for (const d of debtors) {
-      const msg = `${tenantMsgPrefix} You have outstanding balance for Apt ${d.apartmentLabel}. Rent ₦${d.rentBalance}, Bills ₦${d.billBalance}. Total ₦${d.totalBalance}. Please make payment and upload receipt.`;
+      const msg =
+        `Payment Reminder: You have outstanding balance for Apt ${d.apartmentLabel}. ` +
+        `Rent ₦${d.rentBalance}, Bills ₦${d.billBalance}. Total ₦${d.totalBalance}. ` +
+        `Please make payment and upload receipt.`;
 
       try {
         if (isTrue(process.env.NOTIFY_WHATSAPP) && d.phone) {
           await whatsapp.sendWhatsApp({ toE164: d.phone, text: msg });
         }
         if (isTrue(process.env.NOTIFY_EMAIL) && d.email) {
-          await email.sendEmail({
-            toEmail: d.email,
-            subject: "Payment Reminder",
-            text: msg
-          });
+          await email.sendEmail({ toEmail: d.email, subject: "Payment Reminder", text: msg });
         }
-      } catch {
-        // keep going
-      }
+      } catch {}
     }
   }
 
-  // Notify admin (optional)
   if (notifyAdminFlag) {
     try {
-      await notifyAdmin({
-        subject: "Debtors Report",
-        text: summaryText
-      });
-    } catch {
-      // ignore
-    }
+      await notifyAdmin({ subject: "Debtors Report", text: summaryText });
+    } catch {}
   }
 
-  return {
-    count: debtors.length,
-    debtors,
-    summaryText
-  };
+  return { count: debtors.length, debtors, summaryText };
 }
