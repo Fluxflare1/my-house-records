@@ -3,10 +3,13 @@
 import { useEffect, useState } from "react";
 import { getReferenceData, RefOption } from "@/app/actions/reference";
 import { recordPayment, setPaymentVerification } from "@/app/actions/payments";
+import { getRecentPayments, RecentPayment } from "@/app/actions/admin-payments-ux";
 
 export default function AdminPaymentsPage() {
   const [apartments, setApartments] = useState<RefOption[]>([]);
   const [tenants, setTenants] = useState<RefOption[]>([]);
+  const [recent, setRecent] = useState<RecentPayment[]>([]);
+  const [loading, setLoading] = useState(true);
 
   // Record payment form
   const [apartmentId, setApartmentId] = useState("");
@@ -20,9 +23,15 @@ export default function AdminPaymentsPage() {
   const [verifyStatus, setVerifyStatus] = useState<"verified" | "rejected">("verified");
 
   async function refresh() {
-    const ref = await getReferenceData();
-    setApartments(ref.apartments);
-    setTenants(ref.tenants);
+    setLoading(true);
+    try {
+      const [ref, rec] = await Promise.all([getReferenceData(), getRecentPayments(15)]);
+      setApartments(ref.apartments);
+      setTenants(ref.tenants);
+      setRecent(rec);
+    } finally {
+      setLoading(false);
+    }
   }
 
   useEffect(() => {
@@ -30,17 +39,24 @@ export default function AdminPaymentsPage() {
   }, []);
 
   async function submitRecord() {
-    if (!apartmentId || !paymentDate || !amount) return alert("Apartment, date, amount required");
+    if (!apartmentId || !paymentDate || !amount) {
+      return alert("Apartment, date, and amount are required");
+    }
+    const amt = Number(amount);
+    if (!Number.isFinite(amt) || amt <= 0) return alert("Invalid amount");
+
     await recordPayment({
       apartmentId,
       tenantId: tenantId || undefined,
       paymentDate,
-      amount: Number(amount),
+      amount: amt,
       posReference: posRef || undefined
     });
+
     setAmount("");
     setPosRef("");
     alert("Payment recorded as PENDING verification");
+    await refresh();
   }
 
   async function submitVerify() {
@@ -48,6 +64,14 @@ export default function AdminPaymentsPage() {
     await setPaymentVerification({ paymentId: verifyPaymentId, status: verifyStatus });
     setVerifyPaymentId("");
     alert(`Payment marked as ${verifyStatus}`);
+    await refresh();
+  }
+
+  function pickFromRecent(p: RecentPayment) {
+    setVerifyPaymentId(p.paymentId);
+    if (String(p.verificationStatus).toLowerCase() === "verified") {
+      setVerifyStatus("verified");
+    }
   }
 
   return (
@@ -55,21 +79,39 @@ export default function AdminPaymentsPage() {
       <h1 className="text-2xl font-semibold">Payments</h1>
 
       <section className="rounded border bg-white p-4 space-y-3">
-        <h2 className="font-semibold">Record Payment (Manual POS verification)</h2>
+        <h2 className="font-semibold">Record Payment (POS manual verification)</h2>
 
-        <select className="w-full border p-2" value={apartmentId} onChange={e => setApartmentId(e.target.value)}>
-          <option value="">Select apartment</option>
-          {apartments.map(a => <option key={a.id} value={a.id}>{a.label}</option>)}
-        </select>
+        <div className="space-y-1">
+          <label className="text-sm">Apartment</label>
+          <select className="w-full border p-2" value={apartmentId} onChange={e => setApartmentId(e.target.value)}>
+            <option value="">Select apartment</option>
+            {apartments.map(a => <option key={a.id} value={a.id}>{a.label}</option>)}
+          </select>
+        </div>
 
-        <select className="w-full border p-2" value={tenantId} onChange={e => setTenantId(e.target.value)}>
-          <option value="">Select tenant (optional)</option>
-          {tenants.map(t => <option key={t.id} value={t.id}>{t.label}</option>)}
-        </select>
+        <div className="space-y-1">
+          <label className="text-sm">Tenant (optional)</label>
+          <select className="w-full border p-2" value={tenantId} onChange={e => setTenantId(e.target.value)}>
+            <option value="">Select tenant (optional)</option>
+            {tenants.map(t => <option key={t.id} value={t.id}>{t.label}</option>)}
+          </select>
+        </div>
 
-        <input type="date" className="w-full border p-2" value={paymentDate} onChange={e => setPaymentDate(e.target.value)} />
-        <input className="w-full border p-2" placeholder="Amount" value={amount} onChange={e => setAmount(e.target.value)} />
-        <input className="w-full border p-2" placeholder="POS reference (optional)" value={posRef} onChange={e => setPosRef(e.target.value)} />
+        <div className="grid grid-cols-2 gap-2">
+          <div className="space-y-1">
+            <label className="text-sm">Payment Date</label>
+            <input type="date" className="w-full border p-2" value={paymentDate} onChange={e => setPaymentDate(e.target.value)} />
+          </div>
+          <div className="space-y-1">
+            <label className="text-sm">Amount</label>
+            <input className="w-full border p-2" placeholder="e.g. 200000" value={amount} onChange={e => setAmount(e.target.value)} />
+          </div>
+        </div>
+
+        <div className="space-y-1">
+          <label className="text-sm">POS Reference (optional)</label>
+          <input className="w-full border p-2" placeholder="POS ref" value={posRef} onChange={e => setPosRef(e.target.value)} />
+        </div>
 
         <button className="rounded bg-black px-4 py-2 text-white" onClick={submitRecord}>
           Record Payment
@@ -94,6 +136,29 @@ export default function AdminPaymentsPage() {
         <button className="rounded bg-black px-4 py-2 text-white" onClick={submitVerify}>
           Update Verification
         </button>
+
+        <div className="pt-3 border-t">
+          <div className="text-sm font-semibold mb-2">Recent Payments</div>
+          {loading && <div className="text-sm text-gray-600">Loading...</div>}
+          <div className="space-y-2">
+            {recent.map((p) => (
+              <button
+                key={p.paymentId}
+                className="w-full text-left rounded border px-3 py-2 hover:bg-gray-50"
+                onClick={() => pickFromRecent(p)}
+                title="Click to fill Payment ID"
+              >
+                <div className="text-sm">{p.label}</div>
+                {p.receiptUrl && (
+                  <div className="text-xs text-gray-600">Receipt attached</div>
+                )}
+              </button>
+            ))}
+            {!loading && recent.length === 0 && (
+              <div className="text-sm text-gray-600">No payments yet.</div>
+            )}
+          </div>
+        </div>
       </section>
     </div>
   );
