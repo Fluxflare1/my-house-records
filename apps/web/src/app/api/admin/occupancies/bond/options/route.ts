@@ -1,7 +1,8 @@
+apps/web/src/app/api/admin/occupancies/bond/options/route.ts
 import { NextResponse } from "next/server";
 import { requireAdminPermission } from "@/lib/auth/guards";
 import { PERMS } from "@/lib/auth/permissions";
-import { listAvailableApartments, listTenantsForBonding } from "@/lib/occupancy/bonding";
+import { listApartmentsForBonding, listTenantsForBonding } from "@/lib/occupancy/bonding";
 
 export async function GET() {
   try {
@@ -9,7 +10,7 @@ export async function GET() {
 
     const [tenants, apartments] = await Promise.all([
       listTenantsForBonding(),
-      listAvailableApartments()
+      listApartmentsForBonding()
     ]);
 
     return NextResponse.json({ tenants, apartments }, { status: 200 });
