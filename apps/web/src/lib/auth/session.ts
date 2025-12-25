@@ -1,26 +1,37 @@
 import "server-only";
-import { getIronSession } from "iron-session";
+
 import { cookies } from "next/headers";
+import { getIronSession, IronSession } from "iron-session";
 
-export type SessionUser =
-  | { role: "admin"; email: string }
-  | { role: "tenant"; tenantId: string };
+function requirePassword() {
+  const pw = process.env.SESSION_PASSWORD;
+  if (!pw || pw.length < 32) {
+    throw new Error("SESSION_PASSWORD missing or too short. Set it in apps/web/.env.local (>= 32 chars).");
+  }
+  return pw;
+}
 
-export type AppSession = {
-  user?: SessionUser;
+export type ApplicantSessionData = {
+  applicant?: {
+    applicantId: string;
+    email: string;
+    status: string;
+    kycStatus: string;
+  };
 };
 
-const sessionOptions = {
-  cookieName: "my-house-records-session",
-  password: process.env.SESSION_SECRET as string,
+const applicantSessionOptions = {
+  cookieName: "mhr_applicant_session",
+  password: requirePassword(),
   cookieOptions: {
-    secure: process.env.NODE_ENV === "production"
+    httpOnly: true,
+    sameSite: "lax" as const,
+    secure: process.env.NODE_ENV === "production",
+    path: "/"
   }
 };
 
-export async function getSession() {
-  if (!process.env.SESSION_SECRET) {
-    throw new Error("SESSION_SECRET not set");
-  }
-  return getIronSession<AppSession>(cookies(), sessionOptions);
+export async function getApplicantSession(): Promise<IronSession<ApplicantSessionData>> {
+  // cookies() is available in server context
+  return getIronSession<ApplicantSessionData>(cookies(), applicantSessionOptions);
 }
