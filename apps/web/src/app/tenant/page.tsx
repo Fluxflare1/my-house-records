@@ -245,6 +245,9 @@ export default function TenantDashboardSinglePage() {
           <Link className="rounded border px-4 py-2 text-sm" href="/tenant/submit-receipt">
             Upload Receipt
           </Link>
+          <Link className="rounded border px-4 py-2 text-sm" href="/tenant/statement"> {/* ✅ Added View Statement */}
+            View Statement
+          </Link>
 
           {contactHref ? (
             <a className="rounded border px-4 py-2 text-sm" href={contactHref} target="_blank" rel="noreferrer">
