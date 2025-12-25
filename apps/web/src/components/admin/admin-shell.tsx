@@ -50,6 +50,8 @@ export default function AdminShell({ children }: { children: ReactNode }) {
   const [me, setMe] = useState<{ email?: string; fullName?: string; role?: string; permissions?: string[] } | null>(null);
   const [error, setError] = useState<string>("");
 
+  const onLoginPage = pathname === "/admin/login" || pathname.startsWith("/admin/login/");
+
   useEffect(() => {
     let alive = true;
     (async () => {
@@ -76,14 +78,12 @@ export default function AdminShell({ children }: { children: ReactNode }) {
     return NAV.filter((n) => hasPerm(perms, n.perm));
   }, [me]);
 
-  // Redirect to admin login when not logged in
+  // Redirect to admin login when not logged in (but NEVER while already on login page)
   useEffect(() => {
-    if (!loading && (!me || error)) {
-      if (!pathname.startsWith("/admin/login")) {
-        window.location.href = "/admin/login";
-      }
+    if (!loading && (!me || error) && !onLoginPage) {
+      window.location.href = "/admin/login";
     }
-  }, [loading, me, error, pathname]);
+  }, [loading, me, error, onLoginPage]);
 
   if (loading) {
     return (
@@ -93,7 +93,13 @@ export default function AdminShell({ children }: { children: ReactNode }) {
     );
   }
 
-  if (!me) {
+  // Allow /admin/login to render without shell if not authenticated
+  if (!me && onLoginPage) {
+    return <>{children}</>;
+  }
+
+  // If not authenticated on protected pages, show message briefly (redirect will happen)
+  if (!me && !onLoginPage) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="rounded border bg-white p-4 text-sm">
