@@ -1,11 +1,10 @@
 "use server";
 
 import { getAdapters } from "@/lib/adapters";
-import { requireAdmin } from "@/lib/auth/guards";
+import { requireAdminAnyPermission } from "@/lib/auth/guards";
+import { PERMS } from "@/lib/auth/permissions";
 
 export type RefOption = { id: string; label: string };
-
-// New: richer apartment ref (for filtering)
 export type ApartmentRef = { id: string; label: string; propertyId: string };
 
 function opt(id: any, label: any): RefOption {
@@ -13,18 +12,29 @@ function opt(id: any, label: any): RefOption {
 }
 
 export async function getReferenceData() {
-  await requireAdmin();
+  await requireAdminAnyPermission([
+    PERMS.MANAGE_SETUP,
+    PERMS.MANAGE_OCCUPANCY,
+    PERMS.MANAGE_RENT,
+    PERMS.MANAGE_BILLS,
+    PERMS.MANAGE_PAYMENTS,
+    PERMS.VERIFY_PAYMENTS,
+    PERMS.MANAGE_ALLOCATIONS,
+    PERMS.VIEW_STATEMENTS,
+    PERMS.MANAGE_REMINDERS,
+    PERMS.MANAGE_SETTINGS,
+    PERMS.MANAGE_ADMIN_USERS
+  ]);
 
   const { sheets } = getAdapters();
 
-  const [properties, apartmentTypes, apartments, tenants, occupancies] =
-    await Promise.all([
-      sheets.getAll("properties"),
-      sheets.getAll("apartmentTypes"),
-      sheets.getAll("apartments"),
-      sheets.getAll("tenants"),
-      sheets.getAll("occupancies")
-    ]);
+  const [properties, apartmentTypes, apartments, tenants, occupancies] = await Promise.all([
+    sheets.getAll("properties"),
+    sheets.getAll("apartmentTypes"),
+    sheets.getAll("apartments"),
+    sheets.getAll("tenants"),
+    sheets.getAll("occupancies")
+  ]);
 
   const propertiesOut = properties
     .filter((p) => String(p.status).toLowerCase() !== "inactive")
@@ -63,7 +73,7 @@ export async function getReferenceData() {
   return {
     properties: propertiesOut,
     apartmentTypes: apartmentTypesOut,
-    apartments: apartmentsOut, // now richer
+    apartments: apartmentsOut,
     tenants: tenantsOut,
     activeOccupancies: activeOccupanciesOut
   };
