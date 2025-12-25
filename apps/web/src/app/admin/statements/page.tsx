@@ -6,9 +6,11 @@ import { getReferenceData, RefOption } from "@/app/actions/reference";
 import { computeSummary } from "@/lib/utils/statement-summary";
 import { SearchableSelect } from "@/components/common/SearchableSelect";
 
+type ApartmentRef = { id: string; label: string; propertyId: string };
+
 type RefData = {
   properties: RefOption[];
-  apartments: RefOption[];
+  apartments: ApartmentRef[];
   tenants: RefOption[];
 };
 
@@ -16,7 +18,7 @@ export default function AdminStatementsPage() {
   const [ref, setRef] = useState<RefData>({ properties: [], apartments: [], tenants: [] });
 
   const [mode, setMode] = useState<"apartment" | "tenant">("apartment");
-  const [propertyId, setPropertyId] = useState(""); // filter only
+  const [propertyId, setPropertyId] = useState("");
   const [apartmentId, setApartmentId] = useState("");
   const [tenantId, setTenantId] = useState("");
 
@@ -26,7 +28,7 @@ export default function AdminStatementsPage() {
   async function loadRefs() {
     setLoading(true);
     try {
-      const r = await getReferenceData();
+      const r: any = await getReferenceData();
       setRef({ properties: r.properties, apartments: r.apartments, tenants: r.tenants });
     } finally {
       setLoading(false);
@@ -38,21 +40,29 @@ export default function AdminStatementsPage() {
   }, []);
 
   const propertyOptions = useMemo(
-    () => [{ value: "", label: "All properties" }].concat(ref.properties.map(p => ({ value: p.id, label: p.label }))),
+    () => [{ value: "", label: "All properties" }].concat(ref.properties.map((p) => ({ value: p.id, label: p.label }))),
     [ref.properties]
   );
 
-  // We don't have apartment->property label in reference list; so filter is UX-only placeholder for now.
-  // (In a later step, we can return richer apartment refs including property_id.)
+  const filteredApartments = useMemo(() => {
+    if (!propertyId) return ref.apartments;
+    return ref.apartments.filter((a) => a.propertyId === propertyId);
+  }, [ref.apartments, propertyId]);
+
   const apartmentOptions = useMemo(
-    () => ref.apartments.map(a => ({ value: a.id, label: a.label })),
-    [ref.apartments]
+    () => filteredApartments.map((a) => ({ value: a.id, label: a.label })),
+    [filteredApartments]
   );
 
   const tenantOptions = useMemo(
-    () => ref.tenants.map(t => ({ value: t.id, label: t.label })),
+    () => ref.tenants.map((t) => ({ value: t.id, label: t.label })),
     [ref.tenants]
   );
+
+  // If property filter changes, clear apartment selection (prevents invalid selection)
+  useEffect(() => {
+    setApartmentId("");
+  }, [propertyId]);
 
   async function fetchStatement() {
     if (mode === "apartment") {
@@ -91,7 +101,7 @@ export default function AdminStatementsPage() {
           </div>
 
           <SearchableSelect
-            label="Property Filter (optional)"
+            label="Property Filter"
             value={propertyId}
             onChange={setPropertyId}
             options={propertyOptions}
@@ -106,7 +116,7 @@ export default function AdminStatementsPage() {
               value={apartmentId}
               onChange={setApartmentId}
               options={apartmentOptions}
-              placeholder="Select apartment"
+              placeholder={propertyId ? "Select apartment (filtered)" : "Select apartment"}
               disabled={loading}
               searchPlaceholder="Search apartments..."
             />
@@ -131,9 +141,9 @@ export default function AdminStatementsPage() {
           Refresh Lists
         </button>
 
-        {propertyId && (
+        {mode === "apartment" && (
           <div className="text-xs text-gray-600">
-            Property filter is currently informational only (full filtering will be enabled when apartment reference data includes property_id).
+            Apartments shown: {filteredApartments.length} / {ref.apartments.length}
           </div>
         )}
       </section>
