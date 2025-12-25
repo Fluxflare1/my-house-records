@@ -1,4 +1,4 @@
-// apps/web/src/app/tenant/page.tsx
+apps/web/src/app/tenant/page.tsx
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
@@ -34,24 +34,25 @@ function sortByDateAsc(a: any, b: any, key: string) {
   return s(a?.[key]).localeCompare(s(b?.[key]));
 }
 
-function isStandalonePWA() {
-  // iOS uses navigator.standalone, others use display-mode media query
-  const anyNav = navigator as any;
-  const iOSStandalone = !!anyNav?.standalone;
-  const displayModeStandalone = window.matchMedia?.("(display-mode: standalone)")?.matches;
-  return iOSStandalone || !!displayModeStandalone;
-}
-
 export default function TenantDashboardSinglePage() {
   const [home, setHome] = useState<any>(null);
   const [dash, setDash] = useState<any>(null);
   const [loading, setLoading] = useState(true);
-
-  // Welcome control (kept for future extension; welcome itself uses localStorage)
   const [welcomeDismissed, setWelcomeDismissed] = useState(false);
-
-  // Production-ready: show "Installed App" badge when running standalone
   const [installed, setInstalled] = useState(false);
+
+  // PWA detection
+  useEffect(() => {
+    const detectPWA = () => {
+      try {
+        const isStandalone = 
+          (navigator as any)?.standalone ||
+          window.matchMedia?.("(display-mode: standalone)")?.matches;
+        setInstalled(!!isStandalone);
+      } catch {}
+    };
+    detectPWA();
+  }, []);
 
   async function refresh() {
     setLoading(true);
@@ -68,14 +69,6 @@ export default function TenantDashboardSinglePage() {
 
   useEffect(() => {
     refresh();
-  }, []);
-
-  useEffect(() => {
-    try {
-      setInstalled(isStandalonePWA());
-    } catch {
-      setInstalled(false);
-    }
   }, []);
 
   const contactHref = useMemo(() => {
@@ -181,15 +174,19 @@ export default function TenantDashboardSinglePage() {
       <div className="flex items-start justify-between gap-3">
         <div>
           <div className="flex items-center gap-2">
-            <h1 className="text-2xl font-semibold">Welcome, {home?.tenantFirstName}</h1>
-            {installed && <span className="rounded border px-2 py-1 text-xs">Installed App</span>}
+            <h1 className="text-2xl font-semibold">
+              Welcome, {home?.tenantFirstName}
+            </h1>
+            {installed && (
+              <span className="rounded border px-2 py-1 text-xs bg-green-50 text-green-700 border-green-200">
+                Installed App
+              </span>
+            )}
           </div>
-
           <p className="text-sm text-gray-700">
             Your dashboard shows your current apartment, balances, charges, and payments.
           </p>
         </div>
-
         <button className="rounded border px-3 py-2 text-sm" onClick={refresh}>
           Refresh
         </button>
@@ -201,18 +198,10 @@ export default function TenantDashboardSinglePage() {
 
         {apt ? (
           <div className="text-sm text-gray-800 space-y-1">
-            <div>
-              <b>Unit:</b> {apt.unitLabel}
-            </div>
-            <div>
-              <b>Property:</b> {apt.propertyName}
-            </div>
-            <div>
-              <b>Type:</b> {apt.apartmentTypeName}
-            </div>
-            <div>
-              <b>Occupancy Start:</b> {apt.startDate}
-            </div>
+            <div><b>Unit:</b> {apt.unitLabel}</div>
+            <div><b>Property:</b> {apt.propertyName}</div>
+            <div><b>Type:</b> {apt.apartmentTypeName}</div>
+            <div><b>Occupancy Start:</b> {apt.startDate}</div>
           </div>
         ) : (
           <div className="text-sm text-gray-700">
@@ -253,7 +242,6 @@ export default function TenantDashboardSinglePage() {
 
         <div className="flex flex-wrap gap-2">
           <InstallPWAButton />
-
           <Link className="rounded border px-4 py-2 text-sm" href="/tenant/submit-receipt">
             Upload Receipt
           </Link>
@@ -271,16 +259,8 @@ export default function TenantDashboardSinglePage() {
 
         {(admin?.phoneE164 || admin?.email) && (
           <div className="text-xs text-gray-700">
-            {admin.phoneE164 && (
-              <div>
-                <b>Admin Phone:</b> {admin.phoneE164}
-              </div>
-            )}
-            {admin.email && (
-              <div>
-                <b>Admin Email:</b> {admin.email}
-              </div>
-            )}
+            {admin.phoneE164 && <div><b>Admin Phone:</b> {admin.phoneE164}</div>}
+            {admin.email && <div><b>Admin Email:</b> {admin.email}</div>}
           </div>
         )}
       </section>
@@ -299,9 +279,7 @@ export default function TenantDashboardSinglePage() {
                 {openRents.map((r: any) => (
                   <div key={s(r.rent_id)} className="text-sm flex items-center justify-between gap-2">
                     <div>
-                      <div>
-                        <b>Due:</b> {s(r.due_date) || "—"}
-                      </div>
+                      <div><b>Due:</b> {s(r.due_date) || "—"}</div>
                       <div className="text-xs text-gray-600">Rent ID: {s(r.rent_id)}</div>
                     </div>
                     <div className="font-semibold">₦{Math.max(0, n(r.balance))}</div>
@@ -320,9 +298,7 @@ export default function TenantDashboardSinglePage() {
                 {openBills.map((b: any) => (
                   <div key={s(b.bill_id)} className="text-sm flex items-center justify-between gap-2">
                     <div>
-                      <div>
-                        <b>Due:</b> {s(b.due_date) || "—"}
-                      </div>
+                      <div><b>Due:</b> {s(b.due_date) || "—"}</div>
                       <div className="text-xs text-gray-600">
                         {s(b.bill_name) ? `${s(b.bill_name)} • ` : ""}Bill ID: {s(b.bill_id)}
                       </div>
@@ -376,54 +352,46 @@ export default function TenantDashboardSinglePage() {
         )}
       </section>
 
-      {/* Payment account details (published by admin only) */}
+      {/* Payment account details */}
       <section className="rounded border bg-white p-4 space-y-2">
         <div className="text-sm font-semibold">Payment Account Details</div>
 
-        {pay?.accountNumber || pay?.bankName || pay?.accountName ? (
+        {(pay?.accountNumber || pay?.bankName || pay?.accountName) ? (
           <div className="text-sm text-gray-800 space-y-2">
             {pay.bankName && (
               <div className="flex items-center justify-between gap-2">
-                <div>
-                  <b>Bank:</b> {pay.bankName}
-                </div>
-                <button className="text-xs underline" onClick={() => copy(pay.bankName)}>
-                  Copy
-                </button>
+                <div><b>Bank:</b> {pay.bankName}</div>
+                <button className="text-xs underline" onClick={() => copy(pay.bankName)}>Copy</button>
               </div>
             )}
             {pay.accountName && (
               <div className="flex items-center justify-between gap-2">
-                <div>
-                  <b>Account Name:</b> {pay.accountName}
-                </div>
-                <button className="text-xs underline" onClick={() => copy(pay.accountName)}>
-                  Copy
-                </button>
+                <div><b>Account Name:</b> {pay.accountName}</div>
+                <button className="text-xs underline" onClick={() => copy(pay.accountName)}>Copy</button>
               </div>
             )}
             {pay.accountNumber && (
               <div className="flex items-center justify-between gap-2">
-                <div>
-                  <b>Account Number:</b> {pay.accountNumber}
-                </div>
-                <button className="text-xs underline" onClick={() => copy(pay.accountNumber)}>
-                  Copy
-                </button>
+                <div><b>Account Number:</b> {pay.accountNumber}</div>
+                <button className="text-xs underline" onClick={() => copy(pay.accountNumber)}>Copy</button>
               </div>
             )}
             {pay.note && <div className="text-xs text-gray-700">{pay.note}</div>}
           </div>
         ) : (
-          <div className="text-sm text-gray-700">Payment account details are not available. Contact admin.</div>
+          <div className="text-sm text-gray-700">
+            Payment account details are not set yet. Contact admin.
+          </div>
         )}
       </section>
 
-      {/* Debug */}
+      {/* Technical transparency */}
       {dash && (
         <details className="text-sm">
           <summary className="cursor-pointer font-semibold">View Raw Data (JSON)</summary>
-          <pre className="mt-2 overflow-auto rounded bg-gray-100 p-3 text-xs">{JSON.stringify(dash, null, 2)}</pre>
+          <pre className="mt-2 overflow-auto rounded bg-gray-100 p-3 text-xs">
+            {JSON.stringify(dash, null, 2)}
+          </pre>
         </details>
       )}
     </div>
