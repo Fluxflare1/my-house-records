@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { getTenantHomeData } from "@/app/actions/tenant-home";
 import { getTenantDashboard } from "@/app/actions/tenant";
+import InstallPWAButton from "@/components/tenant/install-pwa";
 
 function copy(text: string) {
   if (!text) return;
