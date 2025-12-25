@@ -14,7 +14,11 @@ const NAV: NavItem[] = [
   { href: "/admin", label: "Home" },
 
   { href: "/admin/setup", label: "Setup", perm: PERMS.MANAGE_SETUP },
+  { href: "/admin/setup/schema", label: "Schema", perm: PERMS.MANAGE_SETUP },
+
+  { href: "/admin/applicants", label: "Applicants", perm: PERMS.MANAGE_OCCUPANCY },
   { href: "/admin/occupancy", label: "Occupancy", perm: PERMS.MANAGE_OCCUPANCY },
+  { href: "/admin/occupancy/bond", label: "Bond Tenant", perm: PERMS.MANAGE_OCCUPANCY },
 
   { href: "/admin/rent", label: "Rent", perm: PERMS.MANAGE_RENT },
   { href: "/admin/rent/generate", label: "Generate Rent", perm: PERMS.MANAGE_RENT },
@@ -47,13 +51,19 @@ export default function AdminShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
 
   const [loading, setLoading] = useState(true);
-  const [me, setMe] = useState<{ email?: string; fullName?: string; role?: string; permissions?: string[] } | null>(null);
+  const [me, setMe] = useState<{
+    email?: string;
+    fullName?: string;
+    role?: string;
+    permissions?: string[];
+  } | null>(null);
   const [error, setError] = useState<string>("");
 
   const onLoginPage = pathname === "/admin/login" || pathname.startsWith("/admin/login/");
 
   useEffect(() => {
     let alive = true;
+
     (async () => {
       try {
         const r = await getAdminMe(); // returns null if not logged in
@@ -68,6 +78,7 @@ export default function AdminShell({ children }: { children: ReactNode }) {
         if (alive) setLoading(false);
       }
     })();
+
     return () => {
       alive = false;
     };
@@ -113,9 +124,9 @@ export default function AdminShell({ children }: { children: ReactNode }) {
     <div className="min-h-screen bg-gray-50">
       <header className="border-b bg-white">
         <div className="mx-auto max-w-6xl px-4 py-3 flex items-center justify-between gap-3">
-          <div className="font-semibold">My House Records — Admin</div>
+          <div className="font-semibold">My House — Admin</div>
           <div className="text-xs text-gray-600">
-            {me.fullName || me.email || "Admin"} {me.role ? `(${me.role})` : ""}
+            {me?.fullName || me?.email || "Admin"} {me?.role ? `(${me.role})` : ""}
           </div>
         </div>
       </header>
