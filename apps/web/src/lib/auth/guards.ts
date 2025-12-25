@@ -5,11 +5,7 @@ import { getAdminSession, hasPermission } from "@/lib/auth/admin-session";
 
 /**
  * TENANT SESSION
- * We keep tenant and admin sessions separate.
- * Tenant session cookie name here must match your tenant auth implementation.
- *
- * If your project already uses a different cookie name for tenant,
- * update TENANT_COOKIE_NAME to match it.
+ * Update TENANT_COOKIE_NAME if your tenant auth uses a different cookie name.
  */
 const TENANT_COOKIE_NAME = "mhr_tenant_session";
 
@@ -26,13 +22,6 @@ function parseJsonSafe<T>(raw: string): T | null {
   }
 }
 
-/**
- * Basic tenant session reader.
- * This expects the tenant session cookie value to be JSON like:
- * {"tenantId":"ten_123","phone":"+234..."}
- *
- * If your tenant session is signed/encrypted elsewhere, tell me and I’ll align it.
- */
 export function getTenantSession(): TenantSession | null {
   const raw = cookies().get(TENANT_COOKIE_NAME)?.value || "";
   if (!raw) return null;
@@ -46,14 +35,9 @@ export function getTenantSession(): TenantSession | null {
   };
 }
 
-/**
- * Tenant guard used by tenant server actions/pages.
- */
 export async function requireTenant(): Promise<TenantSession> {
   const session = getTenantSession();
-  if (!session) {
-    throw new Error("TENANT_AUTH_REQUIRED");
-  }
+  if (!session) throw new Error("TENANT_AUTH_REQUIRED");
   return session;
 }
 
@@ -62,16 +46,19 @@ export async function requireTenant(): Promise<TenantSession> {
  */
 export async function requireAdmin() {
   const session = getAdminSession();
-  if (!session) {
-    throw new Error("ADMIN_AUTH_REQUIRED");
-  }
+  if (!session) throw new Error("ADMIN_AUTH_REQUIRED");
   return session;
 }
 
 export async function requireAdminPermission(permission: string) {
   const session = await requireAdmin();
-  if (!hasPermission(session, permission)) {
-    throw new Error("ADMIN_PERMISSION_DENIED");
-  }
+  if (!hasPermission(session, permission)) throw new Error("ADMIN_PERMISSION_DENIED");
+  return session;
+}
+
+export async function requireAdminAnyPermission(permissions: string[]) {
+  const session = await requireAdmin();
+  const ok = permissions.some((p) => hasPermission(session, p));
+  if (!ok) throw new Error("ADMIN_PERMISSION_DENIED");
   return session;
 }
