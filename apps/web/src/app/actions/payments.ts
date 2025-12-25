@@ -6,7 +6,8 @@ import { nowISO } from "@/lib/utils/time";
 import { notifyTenantByPayment } from "@/lib/notifications/notify-helpers";
 import { notifyAdmin } from "@/lib/notifications/admin-notify";
 import { paymentStatusText, paymentRecordedAdminText } from "@/lib/notifications/templates";
-import { requireAdmin } from "@/lib/auth/guards";
+import { requireAdminPermission } from "@/lib/auth/guards";
+import { PERMS } from "@/lib/auth/permissions";
 
 function s(v: any) {
   return String(v ?? "");
@@ -23,7 +24,7 @@ export async function recordPayment(input: {
   amount: number;
   posReference?: string;
 }) {
-  await requireAdmin();
+  await requireAdminPermission(PERMS.MANAGE_PAYMENTS);
 
   const { sheets } = getAdapters();
   const row = {
@@ -40,7 +41,6 @@ export async function recordPayment(input: {
 
   await sheets.appendRow("payments", Object.values(row));
 
-  // Admin notification (optional)
   try {
     const [apartments, tenants] = await Promise.all([sheets.getAll("apartments"), sheets.getAll("tenants")]);
     const apt = apartments.find((a: any) => s(a.apartment_id) === s(input.apartmentId));
@@ -60,7 +60,7 @@ export async function recordPayment(input: {
       })
     });
   } catch {
-    // Never block recording due to notification failure
+    // no block
   }
 
   return row;
@@ -72,14 +72,15 @@ export async function uploadPaymentReceipt(input: {
   mimeType: string;
   base64: string;
 }) {
-  await requireAdmin();
+  await requireAdminPermission(PERMS.MANAGE_PAYMENTS);
 
   const { sheets, drive } = getAdapters();
   const buffer = Buffer.from(input.base64, "base64");
   const uploaded = await drive.uploadBuffer("receipts", input.filename, input.mimeType, buffer);
 
   await sheets.updateRow("payments", "payment_id", input.paymentId, {
-    receipt_drive_file_url: uploaded.webViewLink ?? uploaded.fileId
+    receipt_drive_file_url: uploaded.webViewLink ?? uploaded.fileId,
+    verification_status: "pending"
   });
 
   return { paymentId: input.paymentId, receipt: uploaded.webViewLink ?? uploaded.fileId };
@@ -89,7 +90,7 @@ export async function setPaymentVerification(input: {
   paymentId: string;
   status: "verified" | "rejected";
 }) {
-  await requireAdmin();
+  await requireAdminPermission(PERMS.VERIFY_PAYMENTS);
 
   const { sheets } = getAdapters();
   await sheets.updateRow("payments", "payment_id", input.paymentId, {
