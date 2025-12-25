@@ -1,3 +1,4 @@
+apps/web/src/app/tenant/page.tsx
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
@@ -210,6 +211,7 @@ export default function TenantDashboardSinglePage() {
         <div className="text-sm font-semibold">Quick Actions</div>
 
         <div className="flex flex-wrap gap-2">
+          <InstallPWAButton /> {/* ✅ Added InstallPWAButton */}
           <Link className="rounded border px-4 py-2 text-sm" href="/tenant/submit-receipt">
             Upload Receipt
           </Link>
