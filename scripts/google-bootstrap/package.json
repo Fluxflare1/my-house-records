@@ -2,16 +2,16 @@
   "name": "my-house-records-google-bootstrap",
   "version": "1.0.0",
   "private": true,
-  "type": "module",
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "bootstrap": "npm run build && node dist/index.js"
   },
   "dependencies": {
-    "googleapis": "^144.0.0",
-    "dotenv": "^16.4.5"
+    "dotenv": "^16.4.5",
+    "googleapis": "^144.0.0"
   },
   "devDependencies": {
+    "@types/node": "^22.10.2",
     "typescript": "^5.4.5"
   }
 }
