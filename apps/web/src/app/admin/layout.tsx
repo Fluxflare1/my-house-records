@@ -8,6 +8,7 @@ const links = [
   { href: "/admin/rent", label: "Rent" },
   { href: "/admin/bills", label: "Bills" },
   { href: "/admin/payments", label: "Payments" },
+  { href: "/admin/verification-queue", label: "Verification Queue" },
   { href: "/admin/allocations", label: "Allocations" },
   { href: "/admin/statements", label: "Statements" },
   { href: "/admin/reminders", label: "Reminders" }
