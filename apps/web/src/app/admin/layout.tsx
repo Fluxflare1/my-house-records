@@ -12,7 +12,8 @@ const links = [
   { href: "/admin/allocations", label: "Allocations" },
   { href: "/admin/statements", label: "Statements" },
   { href: "/admin/reminders", label: "Reminders" },
-  { href: "/admin/settings", label: "Settings" }
+  { href: "/admin/settings", label: "Settings" },
+  { href: "/admin/admin-users", label: "Admin Users" }
 ];
 
 export default function AdminLayout({ children }: { children: ReactNode }) {
