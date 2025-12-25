@@ -4,8 +4,17 @@ import { getAdapters } from "@/lib/adapters";
 import { generateId } from "@/lib/utils/id";
 import { nowISO } from "@/lib/utils/time";
 import { notifyTenantByPayment } from "@/lib/notifications/notify-helpers";
-import { paymentStatusText } from "@/lib/notifications/templates";
+import { notifyAdmin } from "@/lib/notifications/admin-notify";
+import { paymentStatusText, paymentRecordedAdminText } from "@/lib/notifications/templates";
 import { requireAdmin } from "@/lib/auth/guards";
+
+function s(v: any) {
+  return String(v ?? "");
+}
+function n(v: any) {
+  const x = Number(v ?? 0);
+  return Number.isFinite(x) ? x : 0;
+}
 
 export async function recordPayment(input: {
   apartmentId: string;
@@ -28,7 +37,32 @@ export async function recordPayment(input: {
     pos_reference: input.posReference ?? "",
     created_at: nowISO()
   };
+
   await sheets.appendRow("payments", Object.values(row));
+
+  // Admin notification (optional)
+  try {
+    const [apartments, tenants] = await Promise.all([sheets.getAll("apartments"), sheets.getAll("tenants")]);
+    const apt = apartments.find((a: any) => s(a.apartment_id) === s(input.apartmentId));
+    const ten = input.tenantId ? tenants.find((t: any) => s(t.tenant_id) === s(input.tenantId)) : null;
+
+    const aptLabel = s(apt?.unit_label || input.apartmentId);
+    const tenLabel = input.tenantId ? s(ten?.full_name || input.tenantId) : "—";
+
+    await notifyAdmin({
+      subject: "New Payment Recorded (Pending Verification)",
+      text: paymentRecordedAdminText({
+        paymentId: row.payment_id,
+        apartmentLabel: aptLabel,
+        tenantLabel: tenLabel,
+        amount: n(row.amount),
+        paymentDate: s(row.payment_date)
+      })
+    });
+  } catch {
+    // Never block recording due to notification failure
+  }
+
   return row;
 }
 
