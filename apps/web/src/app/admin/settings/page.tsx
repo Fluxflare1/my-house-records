@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { getAllSettings, upsertSettingsBulk } from "@/app/actions/admin-settings";
+import { handleAdminClientError } from "@/lib/ui/admin-error";
 
 function s(v: any) {
   return String(v ?? "").trim();
@@ -21,7 +22,6 @@ export default function AdminSettingsPage() {
   const [rows, setRows] = useState<KV[]>([]);
   const [saving, setSaving] = useState(false);
 
-  // Form fields we care about (structured)
   const [publishPaymentDetails, setPublishPaymentDetails] = useState(false);
 
   const [paymentBankName, setPaymentBankName] = useState("");
@@ -41,9 +41,10 @@ export default function AdminSettingsPage() {
       const data = await getAllSettings();
       setRows(data);
 
-      setPublishPaymentDetails(strToBool(kv.get("tenant_payment_details_published") || data.find(x=>x.key==="tenant_payment_details_published")?.value || "false"));
+      const get = (k: string) => s(data.find((x) => x.key === k)?.value || "");
 
-      const get = (k: string) => s((kv.get(k) ?? data.find(x=>x.key===k)?.value) || "");
+      setPublishPaymentDetails(strToBool(get("tenant_payment_details_published") || "false"));
+
       setPaymentBankName(get("payment_bank_name"));
       setPaymentAccountName(get("payment_account_name"));
       setPaymentAccountNumber(get("payment_account_number"));
@@ -52,6 +53,9 @@ export default function AdminSettingsPage() {
       setAdminWhatsAppE164(get("admin_whatsapp_e164"));
       setAdminPhoneE164(get("admin_phone_e164"));
       setAdminEmail(get("admin_email"));
+    } catch (e: any) {
+      if (handleAdminClientError(e)) return;
+      alert(e?.message || "Failed to load settings");
     } finally {
       setLoading(false);
     }
@@ -59,7 +63,6 @@ export default function AdminSettingsPage() {
 
   useEffect(() => {
     load();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   async function save() {
@@ -82,6 +85,7 @@ export default function AdminSettingsPage() {
       alert("Settings saved");
       await load();
     } catch (e: any) {
+      if (handleAdminClientError(e)) return;
       alert(e?.message || "Failed to save settings. Ensure the 'settings' sheet exists with headers: key, value.");
     } finally {
       setSaving(false);
