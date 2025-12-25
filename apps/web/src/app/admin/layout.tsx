@@ -9,7 +9,8 @@ const links = [
   { href: "/admin/bills", label: "Bills" },
   { href: "/admin/payments", label: "Payments" },
   { href: "/admin/allocations", label: "Allocations" },
-  { href: "/admin/statements", label: "Statements" }
+  { href: "/admin/statements", label: "Statements" },
+  { href: "/admin/reminders", label: "Reminders" }
 ];
 
 export default function AdminLayout({ children }: { children: ReactNode }) {
@@ -31,10 +32,7 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
             <ul className="space-y-1">
               {links.map((l) => (
                 <li key={l.href}>
-                  <Link
-                    className="block rounded px-3 py-2 text-sm hover:bg-gray-100"
-                    href={l.href}
-                  >
+                  <Link className="block rounded px-3 py-2 text-sm hover:bg-gray-100" href={l.href}>
                     {l.label}
                   </Link>
                 </li>
