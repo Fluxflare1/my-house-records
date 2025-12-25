@@ -1,69 +1,152 @@
-export type SheetDef = {
-  name: string;
+export type SheetSpec = {
+  title: string;
   headers: string[];
 };
 
-export const SHEETS: SheetDef[] = [
-  {
-    name: "properties",
-    headers: ["property_id", "name", "address", "status", "created_at"]
-  },
-  {
-    name: "apartment_types",
-    headers: ["apartment_type_id", "name", "yearly_rent_amount", "monthly_charge_amount", "active", "created_at"]
-  },
-  {
-    name: "apartments",
-    headers: ["apartment_id", "property_id", "apartment_type_id", "unit_label", "status", "created_at"]
-  },
-  {
-    name: "tenants",
-    headers: ["tenant_id", "full_name", "phone", "email", "status", "created_at"]
-  },
-  {
-    name: "occupancies",
-    headers: ["occupancy_id", "apartment_id", "tenant_id", "start_date", "end_date", "status", "created_at"]
-  },
-  // rent is NOT a bill type (separate)
-  {
-    name: "rents",
-    headers: ["rent_id", "occupancy_id", "period_start", "period_end", "due_date", "expected_amount", "status", "created_at"]
-  },
-  {
-    name: "bills",
-    headers: ["bill_id", "occupancy_id", "bill_name", "period_start", "period_end", "due_date", "expected_amount", "status", "created_at"]
-  },
-  {
-    name: "payments",
-    headers: ["payment_id", "apartment_id", "tenant_id", "payment_date", "amount", "receipt_drive_file_url", "verification_status", "pos_reference", "created_at"]
-  },
-  {
-    name: "allocations",
-    headers: ["allocation_id", "payment_id", "rent_id", "bill_id", "amount_applied", "created_at"]
-  },
-  {
-    name: "documents",
-    headers: ["document_id", "tenant_id", "apartment_id", "occupancy_id", "type", "drive_file_url", "created_at"]
-  },
+export const DRIVE_FOLDERS = ["receipts", "statements", "agreements", "exports"] as const;
 
-  // ✅ NEW: settings key/value for admin-controlled publishing
+export const SHEETS: SheetSpec[] = [
   {
-    name: "settings",
-    headers: ["key", "value"]
+    title: "properties",
+    headers: ["property_id", "name", "address", "created_at", "updated_at"]
   },
-
-  // ✅ NEW: RBAC admin users
   {
-    name: "admin_users",
+    title: "apartmentTypes",
     headers: [
-      "admin_user_id",
-      "full_name",
-      "email",
-      "phone",
-      "password_hash",
+      "apartment_type_id",
+      "property_id",
+      "name",
+      "rent_amount",
+      "monthly_charge_amount",
+      "currency",
+      "created_at",
+      "updated_at"
+    ]
+  },
+  {
+    title: "apartments",
+    headers: [
+      "apartment_id",
+      "property_id",
+      "apartment_type_id",
+      "label",
       "status",
-      "permissions",
+      "created_at",
+      "updated_at"
+    ]
+  },
+  {
+    title: "tenants",
+    headers: ["tenant_id", "first_name", "last_name", "phone", "email", "is_active", "created_at", "updated_at"]
+  },
+  {
+    title: "occupancies",
+    headers: [
+      "occupancy_id",
+      "apartment_id",
+      "tenant_id",
+      "start_date",
+      "end_date",
+      "status",
+      "created_at",
+      "updated_at"
+    ]
+  },
+
+  // Rent is separate (as you requested)
+  {
+    title: "rents",
+    headers: [
+      "rent_id",
+      "occupancy_id",
+      "apartment_id",
+      "tenant_id",
+      "rent_period_start",
+      "rent_period_end",
+      "amount_due",
+      "amount_paid",
+      "status",
+      "created_at",
+      "updated_at"
+    ]
+  },
+
+  // Bills/Charges separate from rent
+  {
+    title: "bills",
+    headers: [
+      "bill_id",
+      "occupancy_id",
+      "apartment_id",
+      "tenant_id",
+      "bill_period",
+      "bill_type",
+      "amount_due",
+      "amount_paid",
+      "status",
+      "created_at",
+      "updated_at"
+    ]
+  },
+
+  // Payments
+  {
+    title: "payments",
+    headers: [
+      "payment_id",
+      "payer_type",
+      "tenant_id",
+      "apartment_id",
+      "occupancy_id",
+      "amount",
+      "currency",
+      "payment_date",
+      "channel",
+      "reference",
+      "status",
+      "created_at",
+      "updated_at"
+    ]
+  },
+
+  // Allocations
+  {
+    title: "allocations",
+    headers: [
+      "allocation_id",
+      "payment_id",
+      "target_type",
+      "target_id",
+      "amount",
+      "created_at",
+      "updated_at"
+    ]
+  },
+
+  // Documents (Drive links)
+  {
+    title: "documents",
+    headers: [
+      "document_id",
+      "document_type",
+      "related_type",
+      "related_id",
+      "drive_file_id",
+      "drive_url",
+      "uploaded_by",
       "created_at"
     ]
+  },
+
+  // App settings (admin publishes account details etc.)
+  {
+    title: "settings",
+    headers: ["key", "value", "updated_at"]
+  },
+
+  // RBAC admin users
+  {
+    title: "adminUsers",
+    headers: ["admin_user_id", "email", "full_name", "role", "password_hash", "is_active", "created_at", "updated_at"]
   }
 ];
