@@ -3,8 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { allocatePayment } from "@/app/actions/allocations";
 import { getAllocationUxData, PaymentOption, ChargeOption } from "@/app/actions/admin-ux";
-
-type Target = { kind: "rent" | "bill"; id: string };
+import { SearchableSelect } from "@/components/common/SearchableSelect";
 
 export default function AdminAllocationsPage() {
   const [loading, setLoading] = useState(true);
@@ -33,12 +32,21 @@ export default function AdminAllocationsPage() {
     refresh();
   }, []);
 
+  const paymentOptions = useMemo(
+    () => payments.map((p) => ({ value: p.id, label: p.label })),
+    [payments]
+  );
+
+  const targets = useMemo(() => (targetKind === "rent" ? rents : bills), [targetKind, rents, bills]);
+  const targetOptions = useMemo(
+    () => targets.map((t) => ({ value: t.id, label: t.label })),
+    [targets]
+  );
+
   const selectedPayment = useMemo(
     () => payments.find((p) => p.id === paymentId) || null,
     [payments, paymentId]
   );
-
-  const targets = useMemo(() => (targetKind === "rent" ? rents : bills), [targetKind, rents, bills]);
 
   const selectedTarget = useMemo(
     () => targets.find((t) => t.id === targetId) || null,
@@ -53,13 +61,10 @@ export default function AdminAllocationsPage() {
     const amt = Number(amountApplied);
     if (!Number.isFinite(amt) || amt <= 0) return alert("Invalid allocation amount");
 
-    // UX protection (server will accept; this prevents mistakes)
     if (selectedTarget && amt > selectedTarget.balance) {
       return alert(`Amount exceeds remaining balance (₦${selectedTarget.balance})`);
     }
     if (selectedPayment && amt > selectedPayment.amount) {
-      // NOTE: this is not “remaining payment” (we haven't enforced multi-allocation sum here yet)
-      // but it prevents obvious over-allocation against single payment amount.
       return alert(`Amount exceeds payment amount (₦${selectedPayment.amount})`);
     }
 
@@ -79,47 +84,48 @@ export default function AdminAllocationsPage() {
     <div className="space-y-6">
       <h1 className="text-2xl font-semibold">Allocations</h1>
       <p className="text-sm text-gray-700">
-        Allocate a <b>verified</b> payment to an <b>open</b> Rent or Bill. Balances are shown to prevent mistakes.
+        Allocate a <b>verified</b> payment to an <b>open</b> Rent or Bill. Use search to find records fast.
       </p>
 
       <section className="rounded border bg-white p-4 space-y-3">
         {loading && <div className="text-sm text-gray-600">Loading options...</div>}
 
-        <div className="space-y-1">
-          <label className="text-sm">Verified Payment</label>
-          <select className="w-full border p-2" value={paymentId} onChange={(e) => setPaymentId(e.target.value)}>
-            <option value="">Select a verified payment</option>
-            {payments.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.label}
-              </option>
-            ))}
-          </select>
-        </div>
+        <SearchableSelect
+          label="Verified Payment"
+          value={paymentId}
+          onChange={setPaymentId}
+          options={paymentOptions}
+          placeholder="Select a verified payment"
+          disabled={loading}
+          searchPlaceholder="Search payments..."
+        />
 
-        <div className="grid grid-cols-2 gap-2">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
           <div className="space-y-1">
             <label className="text-sm">Target Type</label>
-            <select className="w-full border p-2" value={targetKind} onChange={(e) => {
-              setTargetKind(e.target.value as any);
-              setTargetId("");
-            }}>
+            <select
+              className="w-full border p-2"
+              value={targetKind}
+              onChange={(e) => {
+                setTargetKind(e.target.value as any);
+                setTargetId("");
+              }}
+              disabled={loading}
+            >
               <option value="rent">Rent</option>
               <option value="bill">Bill/Charge</option>
             </select>
           </div>
 
-          <div className="space-y-1">
-            <label className="text-sm">Target Record</label>
-            <select className="w-full border p-2" value={targetId} onChange={(e) => setTargetId(e.target.value)}>
-              <option value="">Select target</option>
-              {targets.map((t) => (
-                <option key={t.id} value={t.id}>
-                  {t.label}
-                </option>
-              ))}
-            </select>
-          </div>
+          <SearchableSelect
+            label="Target Record"
+            value={targetId}
+            onChange={setTargetId}
+            options={targetOptions}
+            placeholder="Select target"
+            disabled={loading}
+            searchPlaceholder={`Search ${targetKind}s...`}
+          />
         </div>
 
         <div className="space-y-1">
@@ -141,6 +147,10 @@ export default function AdminAllocationsPage() {
 
         <button className="rounded bg-black px-4 py-2 text-white" onClick={submit}>
           Create Allocation
+        </button>
+
+        <button className="rounded border px-4 py-2 text-sm" onClick={refresh}>
+          Refresh Options
         </button>
       </section>
     </div>
