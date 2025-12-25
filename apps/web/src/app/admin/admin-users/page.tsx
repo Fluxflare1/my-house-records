@@ -10,6 +10,7 @@ import {
   AdminUserDTO
 } from "@/app/actions/admin-users";
 import { PERMS } from "@/lib/auth/permissions";
+import { handleAdminClientError } from "@/lib/ui/admin-error";
 
 type PermKey = keyof typeof PERMS;
 
@@ -35,16 +36,14 @@ export default function AdminUsersPage() {
   const [loading, setLoading] = useState(true);
   const [rows, setRows] = useState<AdminUserDTO[]>([]);
 
-  // Create form
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
   const [password, setPassword] = useState("");
   const [createPerms, setCreatePerms] = useState<string[]>([]);
 
-  // Edit panel
   const [selectedId, setSelectedId] = useState<string>("");
-  const selected = useMemo(() => rows.find(r => r.adminUserId === selectedId) || null, [rows, selectedId]);
+  const selected = useMemo(() => rows.find((r) => r.adminUserId === selectedId) || null, [rows, selectedId]);
 
   const [editPerms, setEditPerms] = useState<string[]>([]);
   const [newPassword, setNewPassword] = useState("");
@@ -54,24 +53,27 @@ export default function AdminUsersPage() {
     try {
       const data = await listAdminUsers();
       setRows(data);
-      if (selectedId && !data.find(d => d.adminUserId === selectedId)) {
+      if (selectedId && !data.find((d) => d.adminUserId === selectedId)) {
         setSelectedId("");
       }
     } catch (e: any) {
+      if (handleAdminClientError(e)) return;
       alert(e?.message || "Failed to load admin users");
     } finally {
       setLoading(false);
     }
   }
 
-  useEffect(() => { refresh(); }, []);
+  useEffect(() => {
+    refresh();
+  }, []);
 
   useEffect(() => {
     if (selected) setEditPerms(selected.permissions || []);
   }, [selected]);
 
   function toggle(list: string[], value: string) {
-    return list.includes(value) ? list.filter(x => x !== value) : [...list, value];
+    return list.includes(value) ? list.filter((x) => x !== value) : [...list, value];
   }
 
   async function doCreate() {
@@ -81,42 +83,70 @@ export default function AdminUsersPage() {
     if (password.trim().length < 8) return alert("Password must be at least 8 characters");
     if (createPerms.length === 0) return alert("Select at least one permission");
 
-    await createAdminUser({
-      fullName,
-      email: em,
-      phone,
-      password,
-      permissions: createPerms
-    });
+    try {
+      await createAdminUser({
+        fullName,
+        email: em,
+        phone,
+        password,
+        permissions: createPerms
+      });
 
-    setFullName(""); setEmail(""); setPhone(""); setPassword(""); setCreatePerms([]);
-    alert("Admin user created");
-    await refresh();
+      setFullName("");
+      setEmail("");
+      setPhone("");
+      setPassword("");
+      setCreatePerms([]);
+
+      alert("Admin user created");
+      await refresh();
+    } catch (e: any) {
+      if (handleAdminClientError(e)) return;
+      alert(e?.message || "Failed to create admin user");
+    }
   }
 
   async function doToggleStatus(u: AdminUserDTO) {
     const next = u.status === "active" ? "disabled" : "active";
     if (!confirm(`Set ${u.email} to ${next.toUpperCase()}?`)) return;
-    await setAdminUserStatus({ adminUserId: u.adminUserId, status: next });
-    await refresh();
+
+    try {
+      await setAdminUserStatus({ adminUserId: u.adminUserId, status: next });
+      await refresh();
+    } catch (e: any) {
+      if (handleAdminClientError(e)) return;
+      alert(e?.message || "Failed to update status");
+    }
   }
 
   async function doSavePerms() {
     if (!selected) return;
     if (editPerms.length === 0) return alert("Select at least one permission");
-    await setAdminUserPermissions({ adminUserId: selected.adminUserId, permissions: editPerms });
-    alert("Permissions updated");
-    await refresh();
+
+    try {
+      await setAdminUserPermissions({ adminUserId: selected.adminUserId, permissions: editPerms });
+      alert("Permissions updated");
+      await refresh();
+    } catch (e: any) {
+      if (handleAdminClientError(e)) return;
+      alert(e?.message || "Failed to update permissions");
+    }
   }
 
   async function doResetPassword() {
     if (!selected) return;
     if (newPassword.trim().length < 8) return alert("Password must be at least 8 characters");
     if (!confirm(`Reset password for ${selected.email}?`)) return;
-    await resetAdminUserPassword({ adminUserId: selected.adminUserId, newPassword });
-    setNewPassword("");
-    alert("Password updated");
-    await refresh();
+
+    try {
+      await resetAdminUserPassword({ adminUserId: selected.adminUserId, newPassword });
+      setNewPassword("");
+      alert("Password updated");
+      await refresh();
+    } catch (e: any) {
+      if (handleAdminClientError(e)) return;
+      alert(e?.message || "Failed to reset password");
+    }
   }
 
   return (
@@ -129,7 +159,6 @@ export default function AdminUsersPage() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        {/* Create */}
         <section className="rounded border bg-white p-4 space-y-4">
           <div className="text-sm font-semibold">Create Admin User</div>
 
@@ -167,8 +196,7 @@ export default function AdminUsersPage() {
                       onChange={() => setCreatePerms(toggle(createPerms, value))}
                     />
                     <span>
-                      <b>{p.label}</b>{" "}
-                      <span className="text-xs text-gray-600">— {p.description}</span>
+                      <b>{p.label}</b> <span className="text-xs text-gray-600">— {p.description}</span>
                     </span>
                   </label>
                 );
@@ -181,7 +209,6 @@ export default function AdminUsersPage() {
           </button>
         </section>
 
-        {/* List + edit */}
         <section className="rounded border bg-white p-4 space-y-4">
           <div className="flex items-center justify-between gap-2">
             <div className="text-sm font-semibold">Existing Admin Users</div>
@@ -237,8 +264,7 @@ export default function AdminUsersPage() {
                         onChange={() => setEditPerms(toggle(editPerms, value))}
                       />
                       <span>
-                        <b>{p.label}</b>{" "}
-                        <span className="text-xs text-gray-600">— {p.description}</span>
+                        <b>{p.label}</b> <span className="text-xs text-gray-600">— {p.description}</span>
                       </span>
                     </label>
                   );
